@@ -69,15 +69,27 @@ function addCorridorMarkers(layer) {
 
 async function fetchStudyCorridorRoute() {
   if (studyCorridorRoutePromise) return studyCorridorRoutePromise;
-  const a = STUDY_CORRIDOR.pointA;
-  const b = STUDY_CORRIDOR.pointB;
-  const waypoints = [a, b].map((point) => `${point.lon},${point.lat}`).join(";");
-  const endpoints = [
-    `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
-    `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
-  ];
 
   studyCorridorRoutePromise = (async () => {
+    // 1. Prefer the canonical bundled bicycle route shared with SUMO runner
+    if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
+      return {
+        latlngs: window.BUNDLED_CORRIDOR_ROUTE.latlngs,
+        distanceM: window.BUNDLED_CORRIDOR_ROUTE.distanceM,
+        source: "OpenStreetMap bicycle corridor (canonical)",
+        approximate: false,
+      };
+    }
+
+    // 2. Fallback to bike routing endpoint if bundled route is unavailable
+    const a = STUDY_CORRIDOR.pointA;
+    const b = STUDY_CORRIDOR.pointB;
+    const waypoints = [a, b].map((point) => `${point.lon},${point.lat}`).join(";");
+    const endpoints = [
+      `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
+      `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
+    ];
+
     for (const url of endpoints) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
@@ -90,23 +102,16 @@ async function fetchStudyCorridorRoute() {
         return {
           latlngs: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
           distanceM: route.distance,
-          source: "OpenStreetMap road routing",
+          source: "OpenStreetMap bicycle route",
           approximate: false,
         };
       } catch (_) {
-        // Try the second public OSM routing endpoint.
+        // Try the next public OSM routing endpoint.
       } finally {
         clearTimeout(timeout);
       }
     }
-    if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
-      return {
-        latlngs: window.BUNDLED_CORRIDOR_ROUTE.latlngs,
-        distanceM: window.BUNDLED_CORRIDOR_ROUTE.distanceM,
-        source: "OpenStreetMap road routing (bundled)",
-        approximate: false,
-      };
-    }
+
     return {
       latlngs: [],
       distanceM: 0,
@@ -176,7 +181,7 @@ function renderVariableCorridorMap(elementId, buckets) {
   if (variableMapLayer) variableMap.removeLayer(variableMapLayer);
   variableMapLayer = L.layerGroup();
 
-  const path = studyCorridorRoute?.latlngs || [];
+  const path = studyCorridorRoute?.latlngs || window.BUNDLED_CORRIDOR_ROUTE?.latlngs || [];
   if (path.length) {
     L.polyline(path, {
       color: "#ffffff", weight: 9, opacity: 0.70, lineCap: "round", lineJoin: "round",
