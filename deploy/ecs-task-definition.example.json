@@ -1,0 +1,36 @@
+{
+  "family": "cyclesafe-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "cyclesafe-backend",
+      "image": "<account-id>.dkr.ecr.<region>.amazonaws.com/cyclesafe-backend:latest",
+      "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
+      "environment": [
+        { "name": "PORT", "value": "8080" },
+        { "name": "SAMPLE_RIDE_PATH", "value": "data/sample_ride.csv" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:cyclesafe/database-url" },
+        { "name": "REDIS_ADDR", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:cyclesafe/redis-addr" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cyclesafe-backend",
+          "awslogs-region": "<region>",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cyclesafe
+      POSTGRES_PASSWORD: cyclesafe
+      POSTGRES_DB: cyclesafe
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyclesafe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-bookworm
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sumo-runner:
+    build:
+      context: ./sumo
+      labels:
+        cyclesafe.build: berlin-study-v8-fast-traci
+    restart: unless-stopped
+    environment:
+      PORT: 8090
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/healthz')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "8090:8090"
+
+  backend:
+    build:
+      context: ./backend
+      labels:
+        cyclesafe.build: berlin-study-v8-fast-traci
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sumo-runner:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://cyclesafe:cyclesafe@postgres:5432/cyclesafe?sslmode=disable
+      REDIS_ADDR: redis:6379
+      SUMO_RUNNER_URL: http://sumo-runner:8090
+      PORT: 8080
+      SAMPLE_RIDE_PATH: data/sample_ride.csv
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      labels:
+        cyclesafe.build: berlin-study-v8-fast-traci
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+
+volumes:
+  pgdata:

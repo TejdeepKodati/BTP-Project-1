@@ -1,0 +1,12 @@
+<edges>
+  <edge id="eastbound" from="west" to="east" priority="1" numLanes="3" speed="13.89">
+    <lane index="0" allow="bicycle" width="2.0" />
+    <lane index="1" allow="bicycle passenger motorcycle truck" width="2.6" />
+    <lane index="2" allow="bicycle passenger motorcycle truck" width="2.6" />
+  </edge>
+  <edge id="westbound" from="east" to="west" priority="1" numLanes="3" speed="13.89">
+    <lane index="0" allow="bicycle" width="2.0" />
+    <lane index="1" allow="bicycle passenger motorcycle truck" width="2.6" />
+    <lane index="2" allow="bicycle passenger motorcycle truck" width="2.6" />
+  </edge>
+</edges>

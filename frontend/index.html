@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyclesafe — cyclist safety telemetry</title>
+<link rel="icon" href="data:,">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <span class="brand-name">Cyclesafe</span>
+        <span class="brand-sub">Telemetry &amp; near-miss monitoring</span>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Primary">
+      <button class="nav-item is-active" data-view="overview" type="button">Overview</button>
+      <button class="nav-item" data-view="rides" type="button">Rides</button>
+      <button class="nav-item" data-view="network" type="button">Road network</button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sim-block">
+        <span class="sim-duration-badge">Duration: Fixed 60 minutes</span>
+        <button id="simulate-btn" class="btn btn-primary" type="button">
+          Run 60-minute simulation
+        </button>
+        <div id="sim-progress-wrap" style="display:none; margin-top:8px;">
+          <div class="progress-bar-wrap">
+            <div id="sim-progress-bar" class="progress-bar" style="width: 0%;"></div>
+          </div>
+          <p id="sim-progress-detail" class="chart-hint" style="margin-top:4px; font-family: var(--font-mono); font-size: 11px;"></p>
+        </div>
+        <p class="sim-hint">Simulates full Oberbaumbrücke corridor traffic (~1,200 vehicles). Filter counterpart interactions directly within each ride.</p>
+      </div>
+
+      <div class="status-row">
+        <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+        <span id="status-text" class="status-text">Ready</span>
+      </div>
+
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+        <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+        <span class="theme-toggle-label">Dark mode</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- ---------------- Overview ---------------- -->
+    <section id="view-overview" class="view is-active">
+      <header class="view-header">
+        <div class="overview-heading-row"><div><h1>Overview</h1><p class="view-sub">Fleet-wide telemetry across every ride ingested so far.</p></div><button id="reset-dashboard-btn" class="btn btn-reset" type="button">Reset dashboard</button></div>
+      </header>
+
+      <div class="stat-strip" id="stat-strip">
+        <div class="stat">
+          <span class="stat-value" id="stat-rides">—</span>
+          <span class="stat-label">Rides logged</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-distance">—</span>
+          <span class="stat-label">Kilometres covered</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-incidents">—</span>
+          <span class="stat-label">Incidents flagged</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-high">—</span>
+          <span class="stat-label">High severity</span>
+        </div>
+        <div class="stat stat-score">
+          <span class="stat-value" id="stat-score">—</span>
+          <span class="stat-label">Safety score</span>
+        </div>
+      </div>
+
+      <div class="overview-map-grid">
+        <div class="panel overview-map-panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="panel-title">Fixed study corridor</div>
+              <p id="study-corridor-status" class="chart-hint">Loading the selected Berlin A → B road route…</p>
+            </div>
+            <span class="corridor-badge">FIXED A → B</span>
+          </div>
+          <div id="study-corridor-map" class="map-el map-el-overview"></div>
+          <div class="map-caption">
+            <span><strong>Point A:</strong> Fehrbelliner Platz area</span>
+            <span><strong>Point B:</strong> Oberbaumbrücke</span>
+            <span><strong>Target:</strong> ≈ 10 km by road</span>
+          </div>
+        </div>
+
+        <div class="panel overview-map-panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="panel-title">Variable incident map</div>
+              <p id="variable-map-status" class="chart-hint">Waiting for simulation or logged ride data…</p>
+            </div>
+            <span class="corridor-badge corridor-badge-variable">LIVE DATA</span>
+          </div>
+          <div id="variable-map" class="map-el map-el-overview"></div>
+          <div class="map-caption">
+            <span><strong>Updates:</strong> after every ride / simulation</span>
+            <span><strong>Heat:</strong> incident density + severity</span>
+            <span><strong>Reset:</strong> clears all logged data</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-grid">
+        <div class="panel panel-rides">
+          <div class="panel-title">Recent rides</div>
+          <div id="recent-rides-list" class="ride-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Rides list ---------------- -->
+    <section id="view-rides" class="view" hidden>
+      <header class="view-header">
+        <h1>Rides</h1>
+        <p class="view-sub">Every ride ingested, SUMO-simulated, or device-uploaded.</p>
+      </header>
+      <div id="all-rides-list" class="ride-list ride-list-full"></div>
+    </section>
+
+    <!-- ---------------- Road network configuration ---------------- -->
+    <section id="view-network" class="view" hidden>
+      <header class="view-header">
+        <h1>Road network configuration</h1>
+        <p class="view-sub">Configure the bicycle interaction family for the 60-minute simulation. Traffic demand is derived from the Oberbaumbrücke reference with stochastic variation on each run.</p>
+      </header>
+
+      <div class="panel network-banner">
+        <div>
+          <div class="panel-title">Study corridor</div>
+          <strong>Fehrbelliner Platz → Oberbaumbrücke</strong>
+          <p class="chart-hint">Fixed study corridor · approximately 10.6 km by the road router · Germany / right-hand traffic</p>
+        </div>
+        <span class="corridor-badge">FIXED 60 MIN</span>
+      </div>
+
+      <div class="network-config-grid">
+        <div class="panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="panel-title">60-minute simulation parameters</div>
+              <p class="chart-hint">Fixed 60-minute duration with recorded random seed and stochastic vehicle departure generation.</p>
+            </div>
+            <span class="corridor-badge corridor-badge-variable">STOCHASTIC</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin: 12px 0;">
+            <div><span style="color:var(--text-muted); font-size:12px;">Duration:</span> <strong>60 minutes (3,600s simulated)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Corridor:</span> <strong>Fehrbelliner Platz → Oberbaumbrücke (10.6 km)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Traffic model:</span> <strong>IDM car-following on right-hand German network</strong></div>
+          </div>
+          <div class="demand-source-note" id="demand-source-note">
+            <strong>Data basis:</strong> Oberbaumbrücke intersection count, 3 Apr 2025, 07:00–19:00 (13,531 motor vehicles, 1,397 bicycles across 12 hours). The 60-minute run applies a representative stochastic demand model around the normalized hourly baseline.
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Demand loaded for the run</div>
+          <div class="demand-grid" id="demand-grid">
+            <div class="demand-card"><span>Bicycle</span><strong id="demand-bikes">~116</strong><small>1,397 / 12h baseline</small></div>
+            <div class="demand-card"><span>Cars / light commercial</span><strong id="demand-cars">~1,022</strong><small>90.6% Kfz share</small></div>
+            <div class="demand-card"><span>Motorbikes</span><strong id="demand-motos">~50</strong><small>4.4% Kfz share</small></div>
+            <div class="demand-card"><span>Heavy-duty &amp; buses</span><strong id="demand-heavy">~56</strong><small>3.9% Lkw + 1.1% Bus</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="network-results-panel" class="panel network-results-panel" style="display:none;">
+        <div class="panel-title-row">
+          <div>
+            <div class="panel-title">Latest simulation outcome</div>
+            <p id="network-results-sub" class="chart-hint"></p>
+          </div>
+          <span class="corridor-badge corridor-badge-variable">SUMO SIMULATED</span>
+        </div>
+        <div class="stat-strip" style="margin-top:12px;">
+          <div class="stat"><span class="stat-value" id="net-stat-points">—</span><span class="stat-label">Telemetry samples</span></div>
+          <div class="stat"><span class="stat-value" id="net-stat-distance">—</span><span class="stat-label">Distance (km)</span></div>
+          <div class="stat"><span class="stat-value" id="net-stat-incidents">—</span><span class="stat-label">Flagged incidents</span></div>
+          <div class="stat"><span class="stat-value" id="net-stat-pairs">—</span><span class="stat-label">Counterpart pairs</span></div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:12px; align-items:center;">
+          <button id="network-view-ride-btn" class="btn btn-secondary" type="button">Inspect ride telemetry &amp; route map &rarr;</button>
+          <span class="chart-hint">Synthetic TraCI telemetry processed through the Cyclesafe sensor ingest and detection pipeline.</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Study corridor map</div>
+        <div id="study-corridor-map-page" class="map-el map-el-corridor-large"></div>
+        <p id="study-corridor-status-page" class="chart-hint">Loading the real road route from OpenStreetMap…</p>
+      </div>
+
+      <div class="panel network-limitations">
+        <div class="panel-title">Simulation interpretation</div>
+        <div class="network-list">
+          <div class="network-item"><strong>Fixed volume, changing interactions</strong><span>The demand count is held constant for a selected data window; SUMO uses a fresh seed so departure times and resulting encounters can change between runs.</span></div>
+          <div class="network-item"><strong>Incidents are not manually prescribed</strong><span>Close passes, hard braking and other detector events come from the simulated trajectories. A “safe pass” is an observed interaction state, not an incident.</span></div>
+          <div class="network-item"><strong>Geometry matters</strong><span>Turn-related events should only be reported where the actual road geometry supports a turn. The current controlled SUMO network is still a prototype and must be replaced/validated against the OSM corridor before geometry-specific claims are made.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- Ride detail ---------------- -->
+    <section id="view-ride-detail" class="view" hidden>
+      <header class="view-header">
+        <button id="back-to-rides" class="link-btn" type="button">&larr; All rides</button>
+        <h1 id="ride-detail-title">Ride</h1>
+        <p class="view-sub" id="ride-detail-sub"></p>
+      </header>
+
+      <div class="panel panel-map">
+        <div class="panel-title-row">
+          <div>
+            <div class="panel-title">Ride corridor &amp; conflict locations</div>
+            <p class="chart-hint">Study corridor between Point A and Point B with detected traffic conflicts on this ride.</p>
+          </div>
+          <span class="corridor-badge">A &rarr; B CORRIDOR</span>
+        </div>
+        <div id="route-map" class="map-el map-el-tall"></div>
+        <div class="ride-map-legend">
+          <span class="legend-item"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Fehrbelliner Platz (Start)</span>
+          <span class="legend-item"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
+          <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (< 1.2 m / Hard brake)</span>
+          <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (< 1.5 m)</span>
+          <span class="legend-item"><span class="legend-dot is-safe"></span>Safe encounter</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Ride conflict overview</div>
+        <div id="ride-conflict-summary" class="interaction-summary"></div>
+        <p id="ride-conflict-area-text" class="chart-hint" style="margin-top:10px;"></p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <div>
+            <div class="panel-title">Pair-level conflict analysis</div>
+            <p class="chart-hint">Select the ego bicycle and a recorded counterpart vehicle. Filter by interaction family and inspect the telemetry time-series and physical evidence.</p>
+          </div>
+          <div class="pair-filter-chips" id="pair-filter-chips" style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="chip-btn is-active" data-pair-family="all" type="button">All vehicles</button>
+            <button class="chip-btn" data-pair-family="bicycle-bicycle" type="button">Bicycle ↔ Bicycle</button>
+            <button class="chip-btn" data-pair-family="bicycle-car" type="button">Bicycle ↔ Car</button>
+            <button class="chip-btn" data-pair-family="bicycle-motorbike" type="button">Bicycle ↔ Motorbike</button>
+            <button class="chip-btn" data-pair-family="bicycle-heavy-duty" type="button">Bicycle ↔ Heavy-duty</button>
+          </div>
+        </div>
+        <div class="interaction-toolbar">
+          <label>Primary bicycle (select bicycle to analyze)
+            <select id="interaction-bike-select" class="interaction-select"></select>
+          </label>
+          <label>Counterpart vehicle (select interacting counterpart)
+            <select id="interaction-vehicle-select" class="interaction-select"></select>
+          </label>
+        </div>
+        <div id="interaction-result"></div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="panel-title">Bicycle acceleration / deceleration</div>
+              <p class="chart-hint" style="margin:0;">Longitudinal acceleration (m/s²). Negative values indicate braking; thresholds at -2.0 and -3.0 m/s².</p>
+            </div>
+            <button class="chip-btn" data-reset-zoom="accel" type="button">Reset zoom</button>
+          </div>
+          <div class="chart-wrap"><canvas id="accel-chart"></canvas></div>
+          <p class="chart-hint">Scroll to zoom, drag to pan.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="panel-title">Gyroscope magnitude</div>
+              <p class="chart-hint" style="margin:0;">Angular rate (rad/s) across 3 spatial axes.</p>
+            </div>
+            <button class="chip-btn" data-reset-zoom="gyro" type="button">Reset zoom</button>
+          </div>
+          <div class="chart-wrap"><canvas id="gyro-chart"></canvas></div>
+          <p class="chart-hint">Scroll to zoom, drag to pan.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title-row">
+          <div>
+            <div class="panel-title">Pair proximity / interaction distance</div>
+            <p class="chart-hint" style="margin:0;">Second-by-second distance to counterpart (m). Lateral clearance thresholds: 1.5 m (medium) and 1.2 m (high, StVO §5(4)).</p>
+          </div>
+          <button class="chip-btn" data-reset-zoom="proximity" type="button">Reset zoom</button>
+        </div>
+        <div class="chart-wrap"><canvas id="proximity-chart"></canvas></div>
+        <p class="chart-hint">Plots continuous second-by-second distance between ego bicycle and selected counterpart.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Flagged incidents</div>
+        <div class="table-wrap">
+          <table class="data-table" id="incidents-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Conflict category</th>
+                <th>Severity</th>
+                <th>Counterpart</th>
+                <th>Magnitude</th>
+                <th>Evidence / Physics explanation</th>
+                <th>Location</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  if (typeof L === "undefined") {
+    document.write('<script src="https:\/\/cdn.jsdelivr.net\/npm\/leaflet@1.9.4\/dist\/leaflet.min.js"><\/script>');
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+  if (typeof Chart === "undefined") {
+    document.write('<script src="https:\/\/cdn.jsdelivr.net\/npm\/chart.js@4.4.0\/dist\/chart.umd.min.js"><\/script>');
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script>
+  if (typeof Hammer === "undefined") {
+    document.write('<script src="https:\/\/unpkg.com\/hammerjs@2.0.8\/hammer.min.js"><\/script>');
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script>
+  if (typeof Chart !== "undefined" && Chart.registry && !Chart.registry.plugins.get("zoom")) {
+    document.write('<script src="https:\/\/unpkg.com\/chartjs-plugin-zoom@2.0.1\/dist\/chartjs-plugin-zoom.min.js"><\/script>');
+  }
+</script>
+<script src="js/theme.js" defer></script>
+<script src="js/api.js" defer></script>
+<script src="js/charts.js" defer></script>
+<script src="js/corridor_route.js" defer></script>
+<script src="js/map.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>

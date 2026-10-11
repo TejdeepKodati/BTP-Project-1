@@ -1,0 +1,86 @@
+{
+  "model_type": "XGBoost Classifier",
+  "xgboost_version": "3.4.1",
+  "num_classes": 3,
+  "classes": {
+    "0": "safe pass",
+    "1": "close pass (medium)",
+    "2": "severe incident (critical)"
+  },
+  "features": [
+    "lateral_clearance_m",
+    "relative_speed_m_s",
+    "ego_speed_m_s",
+    "counterpart_speed_m_s",
+    "min_deceleration_m_s2",
+    "time_to_collision_s",
+    "counterpart_type_encoded"
+  ],
+  "feature_importances": {
+    "lateral_clearance_m": 0.4704,
+    "relative_speed_m_s": 0.0097,
+    "ego_speed_m_s": 0.0275,
+    "counterpart_speed_m_s": 0.0256,
+    "min_deceleration_m_s2": 0.2067,
+    "time_to_collision_s": 0.244,
+    "counterpart_type_encoded": 0.0161
+  },
+  "metrics": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "weighted_f1": 1.0,
+    "confusion_matrix": [
+      [
+        149,
+        0,
+        0
+      ],
+      [
+        0,
+        102,
+        0
+      ],
+      [
+        0,
+        0,
+        54
+      ]
+    ],
+    "detailed_report": {
+      "Safe": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 149.0
+      },
+      "Medium Pass": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 102.0
+      },
+      "Severe Incident": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 54.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 305.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 305.0
+      }
+    }
+  },
+  "training_samples": 1524,
+  "test_samples": 305,
+  "simra_sources_included": true
+}
