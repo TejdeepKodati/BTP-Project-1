@@ -421,19 +421,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const primaryId = bikeSelect.value;
       const allCandidates = getCounterpartsForPrimary(primaryId);
       const filtered = allCandidates.filter((item) => {
-        // If filtering Bicycle ↔ Bicycle, include bicycles (including self)
-        if (activeFamily === "bicycle-bicycle") {
-          return item.counterpart_id === primaryId || agentTypeMatchesFamily(item, "bicycle-bicycle");
-        }
+        if (item.counterpart_id === primaryId) return false;
         return agentTypeMatchesFamily(item, activeFamily);
       });
 
-      // Sort: actual conflicts first (severe first), then close passes, then safe passes, then no interaction, then self
+      // Sort: actual conflicts first (severe first), then close passes, then safe passes, then no interaction
       filtered.sort((a, b) => {
-        const isSelfA = a.counterpart_id === primaryId ? 1 : 0;
-        const isSelfB = b.counterpart_id === primaryId ? 1 : 0;
-        if (isSelfA !== isSelfB) return isSelfA - isSelfB; // self at end
-
         if (b.incident_count !== a.incident_count) return b.incident_count - a.incident_count;
         if (b.high_count !== a.high_count) return b.high_count - a.high_count;
         return a.min_distance_m - b.min_distance_m;
@@ -456,13 +449,10 @@ document.addEventListener("DOMContentLoaded", () => {
       filtered.forEach((item) => {
         const opt = document.createElement("option");
         opt.value = item.counterpart_id;
-        const isSelf = item.counterpart_id === primaryId;
         const typeLabel = prettyAgentType(item.counterpart_agent_type);
         const nameLabel = item.counterpart_id.startsWith("bike") ? (knownBikes.get(item.counterpart_id) || item.counterpart_id) : item.counterpart_id;
 
-        if (isSelf) {
-          opt.textContent = `[${typeLabel}] ${nameLabel} · Same bicycle (no self-conflict)`;
-        } else if (item.incident_count > 0 || (item.status && (item.status.includes("high") || item.status.includes("medium")))) {
+        if (item.incident_count > 0 || (item.status && (item.status.includes("high") || item.status.includes("medium")))) {
           const distStr = item.min_distance_m >= 900 ? "outside corridor" : `${item.min_distance_m.toFixed(2)} m`;
           opt.textContent = `⚠️ [${typeLabel}] ${item.counterpart_id} · ${humanize(item.status)} (${distStr})`;
         } else if (item.min_distance_m < 900 && item.min_distance_m > 0) {
@@ -499,12 +489,12 @@ document.addEventListener("DOMContentLoaded", () => {
         panel.innerHTML = `
           <div class="interaction-summary">
             <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status no-interaction">Same bicycle (no interaction recorded)</span></strong></div>
-            <div class="interaction-card"><span>Closest clearance</span><strong>N/A (Identical vehicle)</strong></div>
-            <div class="interaction-card"><span>Pair safety score</span><strong>100/100</strong></div>
+            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status no-interaction">Identical bicycle</span></strong></div>
+            <div class="interaction-card"><span>Closest clearance</span><strong>—</strong></div>
+            <div class="interaction-card"><span>StVO § 5(4) status</span><strong>N/A (Self-pair excluded)</strong></div>
           </div>
           <div class="pair-evidence-box">
-            <strong>Physics &amp; Trajectory Evidence:</strong> Both selectors reference the same vehicle instance (${primaryId}). A vehicle cannot collide or conflict with itself. No self-interaction recorded in SUMO simulation.
+            <strong>Physics &amp; Trajectory Evidence:</strong> Both selectors reference the same vehicle instance (${primaryId}). A vehicle cannot collide or conflict with itself. Self-interaction excluded from encounter evaluation.
           </div>`;
         window.__selectedEncounterSamples = null;
         renderAccelChart(document.getElementById("accel-chart"), points, null);
@@ -522,9 +512,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const distance = pairIncidents.length
           ? Math.min(...pairIncidents.map((i) => i.magnitude))
           : selected.min_distance_m;
-        const score = selected.high_count > 0
-          ? Math.max(0, 100 - selected.high_count * 25 - selected.medium_count * 10)
-          : Math.max(0, 100 - selected.medium_count * 8);
+
+        const stvoStatus = distance != null && distance < 1.50
+          ? "Below threshold (< 1.50 m)"
+          : "Compliant (≥ 1.50 m)";
 
         const statusSlug = (selected.status || "no-interaction").toLowerCase().replace(/[^a-z0-9]+/g, "-");
         const distanceText = distance >= 900 ? "No close approach" : `${distance.toFixed(2)} m`;
@@ -540,15 +531,20 @@ document.addEventListener("DOMContentLoaded", () => {
           evidenceText = `${mlPrefix}Trajectory log confirms closest clearance of ${distanceText} with counterpart speed of ${selected.samples ? (selected.samples[0].counterpart_speed || 0).toFixed(1) : '0.0'} m/s.`;
         }
 
+        let mlEvidence = "";
+        if (selected.ml_confidence && selected.status) {
+          mlEvidence = ` · [XGBoost ML: ${humanize(selected.status)} (${(selected.ml_confidence * 100).toFixed(1)}% prob)]`;
+        }
+
         panel.innerHTML = `
           <div class="interaction-summary">
             <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
             <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status ${statusSlug}">${humanize(selected.status)}</span></strong></div>
             <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
-            <div class="interaction-card"><span>Pair safety score</span><strong>${Math.round(score)}/100</strong></div>
+            <div class="interaction-card"><span>StVO § 5(4) status</span><strong>${stvoStatus}</strong></div>
           </div>
           <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
-            <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}
+            <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}${mlEvidence}
           </div>`;
 
         window.__selectedEncounterSamples = selected.samples || null;
@@ -562,9 +558,9 @@ document.addEventListener("DOMContentLoaded", () => {
       panel.innerHTML = `
         <div class="interaction-summary">
           <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status safe-pass">No interaction between these</span></strong></div>
+          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status safe-pass">Safe Separation</span></strong></div>
           <div class="interaction-card"><span>Closest clearance</span><strong>No close approach (> 1.50 m)</strong></div>
-          <div class="interaction-card"><span>Pair safety score</span><strong>100/100</strong></div>
+          <div class="interaction-card"><span>StVO § 5(4) status</span><strong>Compliant (≥ 1.50 m maintained)</strong></div>
         </div>
         <div class="pair-evidence-box">
           <strong>Physics &amp; Trajectory Evidence:</strong> According to the SUMO simulation telemetry, ${counterpartLabel} and ${primaryLabel} maintained safe separation (> 1.50 m) along the corridor. No proximity conflict or critical braking event occurred between this pair.

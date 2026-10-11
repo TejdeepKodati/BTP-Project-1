@@ -25,10 +25,10 @@ function tileLayer() {
 
 const STUDY_CORRIDOR = {
   pointA: {
-    name: "Fehrbelliner Platz",
-    area: "Charlottenburg-Wilmersdorf",
-    lat: 52.49063,
-    lon: 13.31418,
+    name: "Ernst-Reuter-Platz",
+    area: "Charlottenburg",
+    lat: 52.51264,
+    lon: 13.32189,
   },
   pointB: {
     name: "Oberbaumbrücke",
@@ -308,7 +308,7 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
     }).bindTooltip("Study corridor route (A → B)", { sticky: true }).addTo(routeLayer);
   }
 
-  // 2. Add Point A (Fehrbelliner Platz) and Point B (Oberbaumbrücke) corridor markers
+  // 2. Add Point A (Ernst-Reuter-Platz) and Point B (Oberbaumbrücke) corridor markers
   addCorridorMarkers(routeLayer);
 
   // 3. Spatially cluster incidents within ~25 meters for precise inspection and hotspot display

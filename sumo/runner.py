@@ -174,17 +174,15 @@ def _init_corridor():
             print(f"Warning: could not load corridor_route.json: {exc}", flush=True)
 
     if not coords:
-        # Fallback road waypoints along the Berlin corridor from Point A (Oberbaumbrücke) to Point B (Fehrbelliner Platz)
+        # Fallback road waypoints along the Berlin corridor from Point A (Ernst-Reuter-Platz) to Point B (Oberbaumbrücke)
         coords = [
-            [13.445003, 52.501198],
-            [13.435000, 52.499800],
-            [13.415000, 52.499000],
-            [13.395000, 52.499200],
-            [13.375000, 52.502800],
-            [13.355000, 52.507000],
-            [13.335000, 52.499400],
-            [13.325000, 52.494200],
-            [13.314089, 52.490581],
+            [13.32189, 52.51264],
+            [13.35000, 52.51400],
+            [13.37700, 52.51600],
+            [13.39500, 52.51200],
+            [13.41500, 52.51000],
+            [13.43500, 52.50400],
+            [13.44500, 52.50120],
         ]
 
     CORRIDOR_COORDS = coords
