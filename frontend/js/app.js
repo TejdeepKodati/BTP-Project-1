@@ -26,10 +26,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const simulateBtn = document.getElementById("simulate-btn");
+  const netSimulateBtn = document.getElementById("network-simulate-btn");
   const simProgressWrap = document.getElementById("sim-progress-wrap");
   const simProgressBar = document.getElementById("sim-progress-bar");
   const simProgressDetail = document.getElementById("sim-progress-detail");
   if (simulateBtn) simulateBtn.addEventListener("click", onSimulateClick);
+  if (netSimulateBtn) netSimulateBtn.addEventListener("click", onSimulateClick);
 
   const resetBtn = document.getElementById("reset-dashboard-btn");
   if (resetBtn) resetBtn.addEventListener("click", onResetDashboard);
@@ -278,15 +280,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Provide at least 8 primary bicycles from simulation traffic demand for comprehensive inspection
-    for (let i = 1; knownBikes.size < 8 && i <= 15; i++) {
-      const padId = `bike_${String(i).padStart(4, "0")}`;
-      if (!knownBikes.has(padId)) {
-        knownBikes.set(padId, formatBikeId(padId));
-      }
-    }
-
-    // Populate primary bicycle dropdown
+    // Populate primary bicycle dropdown ONLY with actual recorded bicycles from the simulation
     bikeSelect.innerHTML = "";
     bikeSelect.disabled = false;
     knownBikes.forEach((label, id) => {
@@ -310,7 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
           btn.classList.add("is-active");
           activeFamily = btn.dataset.pairFamily || "all";
           populateVehicles();
-          renderFilteredIncidents();
         };
       });
     }
@@ -319,8 +312,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const pEncMap = bikeEncounters[primaryId] || {};
       const map = new Map();
 
-      // Dedicated encounters for this primary bicycle
+      // Real recorded encounters for this primary bicycle (exclude self)
       Object.keys(pEncMap).forEach((cid) => {
+        if (cid === primaryId) return; // Eliminate self-pairing
         const enc = pEncMap[cid];
         map.set(cid, {
           counterpart_id: cid,
@@ -331,15 +325,17 @@ document.addEventListener("DOMContentLoaded", () => {
           lat: enc.closest_lat,
           lon: enc.closest_lon,
           evidence: enc.evidence || "",
+          ml_confidence: enc.ml_confidence,
           incident_count: (enc.status && (enc.status.includes("high") || enc.status.includes("medium"))) ? 1 : 0,
           high_count: (enc.status && enc.status.includes("high")) ? 1 : 0,
           medium_count: (enc.status && enc.status.includes("medium")) ? 1 : 0,
         });
       });
 
-      // If primary is ego_bicycle, incorporate all tracked interactions
+      // If primary is ego_bicycle, incorporate all real tracked interactions from ingestion
       if (primaryId === "ego_bicycle") {
         interactions.forEach((item) => {
+          if (item.counterpart_id === primaryId) return; // Eliminate self-pairing
           if (!map.has(item.counterpart_id)) map.set(item.counterpart_id, item);
         });
       } else {
@@ -355,85 +351,28 @@ document.addEventListener("DOMContentLoaded", () => {
             lat: egoMutual.lat,
             lon: egoMutual.lon,
             evidence: egoMutual.evidence || "",
+            ml_confidence: egoMutual.ml_confidence,
             incident_count: egoMutual.incident_count,
             high_count: egoMutual.high_count,
             medium_count: egoMutual.medium_count,
           });
         }
-
-        // Add other simulation vehicles as options so the user can inspect unconflicted counterparts
-        interactions.forEach((item) => {
-          const cid = item.counterpart_id;
-          if (!map.has(cid) && cid !== primaryId) {
-            map.set(cid, {
-              counterpart_id: cid,
-              counterpart_agent_type: item.counterpart_agent_type,
-              min_distance_m: 999,
-              status: "no interaction",
-              samples: null,
-              lat: null,
-              lon: null,
-              evidence: "",
-              incident_count: 0,
-              high_count: 0,
-              medium_count: 0,
-            });
-          }
-        });
       }
 
-      // Always include all other bicycles (and the same bicycle for self-check)
-      knownBikes.forEach((lbl, bId) => {
-        if (!map.has(bId)) {
-          map.set(bId, {
-            counterpart_id: bId,
-            counterpart_agent_type: "bike",
-            min_distance_m: bId === primaryId ? 0 : 999,
-            status: bId === primaryId ? "same bicycle" : "no interaction",
-            samples: null,
-            lat: null,
-            lon: null,
-            evidence: "",
-            incident_count: 0,
-            high_count: 0,
-            medium_count: 0,
-          });
-        }
-      });
-
+      // DO NOT fabricate placeholder 999m or self-pairing records.
       return Array.from(map.values());
-    }
-
-    function renderFilteredIncidents() {
-      const primaryId = bikeSelect.value;
-      const filteredIncidents = incidents.filter((inc) => {
-        if (!agentTypeMatchesFamily(inc, activeFamily)) return false;
-        if (inc.primary_bike_id && inc.primary_bike_id !== primaryId) return false;
-        return true;
-      });
-      renderIncidentsTable(filteredIncidents);
-      const counterpartList = getCounterpartsForPrimary(primaryId);
-      const selected = counterpartList.find((x) => x.counterpart_id === vehicleSelect.value);
-      renderRoute("route-map", points, filteredIncidents, selected ? selected.counterpart_id : null, selected, primaryId);
     }
 
     function populateVehicles() {
       const primaryId = bikeSelect.value;
       const allCandidates = getCounterpartsForPrimary(primaryId);
       const filtered = allCandidates.filter((item) => {
-        // If filtering Bicycle ↔ Bicycle, include bicycles (including self)
-        if (activeFamily === "bicycle-bicycle") {
-          return item.counterpart_id === primaryId || agentTypeMatchesFamily(item, "bicycle-bicycle");
-        }
+        if (item.counterpart_id === primaryId) return false;
         return agentTypeMatchesFamily(item, activeFamily);
       });
 
-      // Sort: actual conflicts first (severe first), then close passes, then safe passes, then no interaction, then self
+      // Sort: actual conflicts first (severe first), then close passes, then safe passes by distance
       filtered.sort((a, b) => {
-        const isSelfA = a.counterpart_id === primaryId ? 1 : 0;
-        const isSelfB = b.counterpart_id === primaryId ? 1 : 0;
-        if (isSelfA !== isSelfB) return isSelfA - isSelfB; // self at end
-
         if (b.incident_count !== a.incident_count) return b.incident_count - a.incident_count;
         if (b.high_count !== a.high_count) return b.high_count - a.high_count;
         return a.min_distance_m - b.min_distance_m;
@@ -445,7 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const opt = document.createElement("option");
         opt.value = "";
         const famLabel = prettyConflict(activeFamily) !== "all" ? prettyConflict(activeFamily) : "counterpart";
-        opt.textContent = `No ${famLabel} counterparts recorded for this bicycle`;
+        opt.textContent = `No recorded ${famLabel} encounters for this bicycle`;
         vehicleSelect.appendChild(opt);
         vehicleSelect.disabled = true;
         updatePairCard(null);
@@ -456,19 +395,13 @@ document.addEventListener("DOMContentLoaded", () => {
       filtered.forEach((item) => {
         const opt = document.createElement("option");
         opt.value = item.counterpart_id;
-        const isSelf = item.counterpart_id === primaryId;
         const typeLabel = prettyAgentType(item.counterpart_agent_type);
         const nameLabel = item.counterpart_id.startsWith("bike") ? (knownBikes.get(item.counterpart_id) || item.counterpart_id) : item.counterpart_id;
 
-        if (isSelf) {
-          opt.textContent = `[${typeLabel}] ${nameLabel} · Same bicycle (no self-conflict)`;
-        } else if (item.incident_count > 0 || (item.status && (item.status.includes("high") || item.status.includes("medium")))) {
-          const distStr = item.min_distance_m >= 900 ? "outside corridor" : `${item.min_distance_m.toFixed(2)} m`;
-          opt.textContent = `⚠️ [${typeLabel}] ${item.counterpart_id} · ${humanize(item.status)} (${distStr})`;
-        } else if (item.min_distance_m < 900 && item.min_distance_m > 0) {
-          opt.textContent = `✓ [${typeLabel}] ${item.counterpart_id} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
+        if (item.incident_count > 0 || (item.status && (item.status.includes("high") || item.status.includes("medium")))) {
+          opt.textContent = `⚠️ [${typeLabel}] ${nameLabel} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
         } else {
-          opt.textContent = `• [${typeLabel}] ${item.counterpart_id} · No interaction recorded`;
+          opt.textContent = `✓ [${typeLabel}] ${nameLabel} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
         }
         vehicleSelect.appendChild(opt);
       });
@@ -479,106 +412,75 @@ document.addEventListener("DOMContentLoaded", () => {
     function updatePairCard(selected) {
       const primaryId = bikeSelect.value;
       const primaryLabel = knownBikes.get(primaryId) || primaryId;
-      const filteredIncidents = incidents.filter((inc) => agentTypeMatchesFamily(inc, activeFamily));
 
       if (!selected) {
-        panel.innerHTML = `<div class="empty-state"><strong>No vehicles match the selected filter</strong>Try selecting "All vehicles" or another interaction family.</div>`;
+        panel.innerHTML = `<div class="empty-state"><strong>No recorded encounters match the selected filter</strong>Try selecting "All vehicles" or another bicycle.</div>`;
+        renderIncidentsTable([]);
         window.__selectedEncounterSamples = null;
         renderAccelChart(document.getElementById("accel-chart"), points, null);
         renderProximityChart(document.getElementById("proximity-chart"), points, null);
-        renderRoute("route-map", points, filteredIncidents, null, null, primaryId);
+        renderRoute("route-map", points, [], null, null, primaryId);
         return;
       }
 
       const counterpartId = selected.counterpart_id;
-      const isSelf = counterpartId === primaryId;
       const counterpartLabel = counterpartId.startsWith("bike") ? (knownBikes.get(counterpartId) || counterpartId) : `${prettyAgentType(selected.counterpart_agent_type)} · ${counterpartId}`;
 
-      // Case 1: Same bicycle selected in both dropdowns
-      if (isSelf) {
-        panel.innerHTML = `
-          <div class="interaction-summary">
-            <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status no-interaction">Same bicycle (no interaction recorded)</span></strong></div>
-            <div class="interaction-card"><span>Closest clearance</span><strong>N/A (Identical vehicle)</strong></div>
-            <div class="interaction-card"><span>Pair safety score</span><strong>100/100</strong></div>
-          </div>
-          <div class="pair-evidence-box">
-            <strong>Physics &amp; Trajectory Evidence:</strong> Both selectors reference the same vehicle instance (${primaryId}). A vehicle cannot collide or conflict with itself. No self-interaction recorded in SUMO simulation.
-          </div>`;
-        window.__selectedEncounterSamples = null;
-        renderAccelChart(document.getElementById("accel-chart"), points, null);
-        renderProximityChart(document.getElementById("proximity-chart"), points, null);
-        renderRoute("route-map", points, filteredIncidents, null, null, primaryId);
-        return;
-      }
+      // Strictly pair-specific incidents
+      const pairIncidents = incidents.filter((i) => i.counterpart_id === counterpartId && (!i.primary_bike_id || i.primary_bike_id === primaryId));
+      renderIncidentsTable(pairIncidents);
 
-      // Case 2: Distinct vehicles with recorded encounter/conflict
-      const pairIncidents = incidents.filter((i) => i.counterpart_id === counterpartId);
-      const hasEncounter = selected.samples && selected.samples.length > 0;
       const hasConflict = pairIncidents.length > 0 || (selected.status && (selected.status.includes("high") || selected.status.includes("medium")));
+      const distance = pairIncidents.length
+        ? Math.min(...pairIncidents.map((i) => i.magnitude))
+        : selected.min_distance_m;
 
-      if (hasConflict || hasEncounter) {
-        const distance = pairIncidents.length
-          ? Math.min(...pairIncidents.map((i) => i.magnitude))
-          : selected.min_distance_m;
-        const score = selected.high_count > 0
-          ? Math.max(0, 100 - selected.high_count * 25 - selected.medium_count * 10)
-          : Math.max(0, 100 - selected.medium_count * 8);
-
-        const statusSlug = (selected.status || "no-interaction").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        const distanceText = distance >= 900 ? "No close approach" : `${distance.toFixed(2)} m`;
-
-        let evidenceText = selected.evidence || "";
-        if (!evidenceText && pairIncidents.length > 0) {
-          evidenceText = pairIncidents.map((i) => i.evidence).filter(Boolean).join(" · ");
-        }
-        if (!evidenceText) {
-          const mlPrefix = selected.ml_confidence
-            ? `[XGBoost ML · ${(selected.ml_confidence * 100).toFixed(1)}% conf] `
-            : "";
-          evidenceText = `${mlPrefix}Trajectory log confirms closest clearance of ${distanceText} with counterpart speed of ${selected.samples ? (selected.samples[0].counterpart_speed || 0).toFixed(1) : '0.0'} m/s.`;
-        }
-
-        panel.innerHTML = `
-          <div class="interaction-summary">
-            <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status ${statusSlug}">${humanize(selected.status)}</span></strong></div>
-            <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
-            <div class="interaction-card"><span>Pair safety score</span><strong>${Math.round(score)}/100</strong></div>
-          </div>
-          <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
-            <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}
-          </div>`;
-
-        window.__selectedEncounterSamples = selected.samples || null;
-        renderAccelChart(document.getElementById("accel-chart"), points, selected.samples);
-        renderProximityChart(document.getElementById("proximity-chart"), points, selected.samples);
-        renderRoute("route-map", points, filteredIncidents, counterpartId, selected, primaryId);
-        return;
+      // Honest safety score derived from actual interaction physics
+      let score = 100;
+      if (selected.high_count > 0) {
+        score = Math.max(10, 100 - selected.high_count * 25 - selected.medium_count * 10);
+      } else if (selected.medium_count > 0) {
+        score = Math.max(40, 100 - selected.medium_count * 12);
+      } else if (distance < 1.5) {
+        score = Math.max(60, Math.round(50 + (distance / 1.5) * 40));
+      } else {
+        score = Math.min(100, Math.round(85 + Math.min(15, (distance - 1.5) * 10)));
       }
 
-      // Case 3: Distinct vehicles with NO interaction recorded (maintained safe separation)
+      const statusSlug = (selected.status || "safe-encounter").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const distanceText = `${distance.toFixed(2)} m`;
+
+      let evidenceText = selected.evidence || "";
+      if (!evidenceText && pairIncidents.length > 0) {
+        evidenceText = pairIncidents.map((i) => i.evidence).filter(Boolean).join(" · ");
+      }
+      if (!evidenceText) {
+        const mlPrefix = selected.ml_confidence
+          ? `[XGBoost ML · ${(selected.ml_confidence * 100).toFixed(1)}% conf] `
+          : "";
+        const spd = selected.samples && selected.samples[0] ? (selected.samples[0].counterpart_speed || 0).toFixed(1) : "0.0";
+        evidenceText = `${mlPrefix}Trajectory record confirms closest clearance of ${distanceText} with counterpart speed of ${spd} m/s.`;
+      }
+
       panel.innerHTML = `
         <div class="interaction-summary">
           <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status safe-pass">No interaction between these</span></strong></div>
-          <div class="interaction-card"><span>Closest clearance</span><strong>No close approach (> 1.50 m)</strong></div>
-          <div class="interaction-card"><span>Pair safety score</span><strong>100/100</strong></div>
+          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status ${statusSlug}">${humanize(selected.status)}</span></strong></div>
+          <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
+          <div class="interaction-card"><span>Pair safety score</span><strong>${Math.round(score)}/100</strong></div>
         </div>
-        <div class="pair-evidence-box">
-          <strong>Physics &amp; Trajectory Evidence:</strong> According to the SUMO simulation telemetry, ${counterpartLabel} and ${primaryLabel} maintained safe separation (> 1.50 m) along the corridor. No proximity conflict or critical braking event occurred between this pair.
+        <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
+          <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}
         </div>`;
 
-      window.__selectedEncounterSamples = null;
-      renderAccelChart(document.getElementById("accel-chart"), points, null);
-      renderProximityChart(document.getElementById("proximity-chart"), points, null);
-      renderRoute("route-map", points, filteredIncidents, null, null, primaryId);
+      window.__selectedEncounterSamples = selected.samples || null;
+      renderAccelChart(document.getElementById("accel-chart"), points, selected.samples);
+      renderProximityChart(document.getElementById("proximity-chart"), points, selected.samples);
+      renderRoute("route-map", points, pairIncidents, counterpartId, selected, primaryId);
     }
 
     bikeSelect.onchange = () => {
       populateVehicles();
-      renderFilteredIncidents();
     };
 
     vehicleSelect.onchange = () => {
@@ -589,7 +491,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     populateVehicles();
-    renderFilteredIncidents();
   }
 
   function renderIncidentsTable(incidents) {
@@ -685,8 +586,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function onSimulateClick() {
     const btn = document.getElementById("simulate-btn");
-    if (!btn) return;
-    btn.disabled = true;
+    const netBtn = document.getElementById("network-simulate-btn");
+    if (btn) btn.disabled = true;
+    if (netBtn) netBtn.disabled = true;
     if (simProgressWrap) simProgressWrap.style.display = "block";
     if (simProgressBar) simProgressBar.style.width = "0%";
     if (simProgressDetail) simProgressDetail.textContent = "Connecting to SUMO runner…";
@@ -715,7 +617,8 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("error", "Simulation failed");
       showToast(err.message, true);
     } finally {
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
+      if (netBtn) netBtn.disabled = false;
       setTimeout(() => {
         if (simProgressWrap) simProgressWrap.style.display = "none";
         setStatus(null, "Ready");

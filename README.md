@@ -54,12 +54,13 @@ The platform bridges real-world crowdsourced empirical bicycle sensor datasets (
 ```
 
 ### 1. Multi-Bicycle Road Network Simulation
-- **Continuous 2D Spatial Subscriptions**: Tracks up to 16 primary bicycles (`ego_bicycle`, `bike_0001` ... `bike_0015`) running concurrent bidirectional corridor routes along Berlin Oberbaumbrücke / Charlottenburg.
-- **Empirical Traffic Calibration**: Calibrated against official 12-hour Berlin SenMVKU intersection counts (Cars: 90.6%, Trucks/Buses: 5.0%, Motorcycles: 4.4%, Bicycles: ~116/hr).
+- **Canonical Berlin Corridor**: Mapped along the Ernst-Reuter-Platz → Oberbaumbrücke route (~9.5 km), Germany / right-hand traffic network.
+- **Continuous 2D Spatial Subscriptions**: Tracks simulated bicycles (`ego_bicycle`, `bike_0001` ...) running concurrent bidirectional corridor routes with TraCI context subscriptions.
+- **Empirical Traffic Calibration**: Calibrated against official 12-hour Berlin SenMVKU intersection counts (Cars: 90.6%, Trucks/Buses: 5.0%, Motorcycles: 4.4%, Bicycles: ~116/hr) with stochastic arrival generation.
 - **Geometric Edge Clearance**: Computes exact physical polygon edge-to-edge separation distances between bicycles and surrounding vehicle boundaries at every 0.5s step.
 
 ### 2. Machine Learning Safety Engine (XGBoost)
-- **Empirical Training Data**: Trained on real-world crowdsourced cyclist incident logs from TU Berlin's **SimRa dataset** (`simra_data/`) combined with continuous TraCI surrogate safety kinematics.
+- **Empirical Training Data**: Trained on real-world crowdsourced cyclist incident logs from TU Berlin's **SimRa dataset** (`simra_data/`) combined with continuous TraCI surrogate safety kinematics (1,524 samples).
 - **Features Evaluated**:
   - Lateral Clearance Distance ($m$) — *47.0% importance gain*
   - Time-To-Collision (TTC in seconds) — *24.4% importance gain*
@@ -71,13 +72,12 @@ The platform bridges real-world crowdsourced empirical bicycle sensor datasets (
   - `Close Pass (Medium)` (Lateral distance $1.0 - 1.5$ m, moderate speed differential)
   - `Severe Incident (Critical)` (Lateral distance $< 1.0$ m or emergency deceleration $< -2.8\ m/s^2$)
 - **Dual-Engine Predictor**: Native `xgboost.Booster` with automatic fallback to an internal pure-Python tree ensemble parser for zero-dependency portability in containers.
+- **Methodology & Limitations**: High classification score reflects exact learning of the deterministic kinematic conflict boundary (StVO § 5(4) clearance, TTC, and deceleration thresholds).
 
 ### 3. Interactive Web Dashboard
-- **Dual Dynamic Selectors**: Left selector chooses the **Primary Bicycle**; right selector chooses the **Counterpart Vehicle** (with category chips: *All, Bicycle ↔ Bicycle, Bicycle ↔ Car, Bicycle ↔ Truck/Bus, Bicycle ↔ Motorcycle*).
-- **Intelligent Interaction States**:
-  - *Same Bicycle selected*: Explicitly displays *"Same bicycle (no interaction recorded)"* and 100/100 safety score.
-  - *Safe / Unconflicted Pair*: Displays *"No interaction between these"*, clearance $> 1.50$ m, and physics evidence.
-  - *Conflicted Pair*: Highlights the conflict, displaying exact lateral clearance, time-to-collision, XGBoost ML confidence score, and trajectory evidence.
+- **Dual Dynamic Selectors**: Left selector chooses the **Primary Bicycle** (strictly actual bicycles recorded in the run); right selector chooses recorded **Counterpart Vehicles** (filtered by interaction family: *All, Bicycle ↔ Bicycle, Bicycle ↔ Car, Bicycle ↔ Truck/Bus, Bicycle ↔ Motorcycle*).
+- **Data Integrity**: No placeholder/mock vehicles, no self-pairing options, no fabricated 999m records, and no hardcoded safety scores.
+- **Pair-Specific Telemetry**: Acceleration/braking curves, proximity time-series, and Leaflet map markers reflect strictly the selected pair.
 - **Incident Hotspot Clustering**: Spatially aggregates conflicts occurring within 25 m into distinct collision hotspots on Leaflet maps with interactive pin hover tooltips.
 
 ---

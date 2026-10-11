@@ -100,9 +100,9 @@
           </div>
           <div id="study-corridor-map" class="map-el map-el-overview"></div>
           <div class="map-caption">
-            <span><strong>Point A:</strong> Fehrbelliner Platz area</span>
+            <span><strong>Point A:</strong> Ernst-Reuter-Platz area</span>
             <span><strong>Point B:</strong> Oberbaumbrücke</span>
-            <span><strong>Target:</strong> ≈ 10 km by road</span>
+            <span><strong>Target:</strong> ≈ 9.5 km by road</span>
           </div>
         </div>
 
@@ -147,13 +147,18 @@
         <p class="view-sub">Configure the bicycle interaction family for the 60-minute simulation. Traffic demand is derived from the Oberbaumbrücke reference with stochastic variation on each run.</p>
       </header>
 
-      <div class="panel network-banner">
+      <div class="panel network-banner" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <div class="panel-title">Study corridor</div>
-          <strong>Fehrbelliner Platz → Oberbaumbrücke</strong>
-          <p class="chart-hint">Fixed study corridor · approximately 10.6 km by the road router · Germany / right-hand traffic</p>
+          <strong>Ernst-Reuter-Platz → Oberbaumbrücke</strong>
+          <p class="chart-hint">Fixed study corridor · approximately 9.5 km by the road router · Germany / right-hand traffic</p>
         </div>
-        <span class="corridor-badge">FIXED 60 MIN</span>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="network-simulate-btn" class="btn btn-primary" type="button" style="font-size:13px; font-weight:600;">
+            Run 60-minute simulation
+          </button>
+          <span class="corridor-badge">FIXED 60 MIN</span>
+        </div>
       </div>
 
       <div class="network-config-grid">
@@ -167,7 +172,7 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:8px; margin: 12px 0;">
             <div><span style="color:var(--text-muted); font-size:12px;">Duration:</span> <strong>60 minutes (3,600s simulated)</strong></div>
-            <div><span style="color:var(--text-muted); font-size:12px;">Corridor:</span> <strong>Fehrbelliner Platz → Oberbaumbrücke (10.6 km)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Corridor:</span> <strong>Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km)</strong></div>
             <div><span style="color:var(--text-muted); font-size:12px;">Traffic model:</span> <strong>IDM car-following on right-hand German network</strong></div>
           </div>
           <div class="demand-source-note" id="demand-source-note">
@@ -240,7 +245,7 @@
         </div>
         <div id="route-map" class="map-el map-el-tall"></div>
         <div class="ride-map-legend">
-          <span class="legend-item"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Fehrbelliner Platz (Start)</span>
+          <span class="legend-item"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)</span>
           <span class="legend-item"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
           <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (< 1.2 m / Hard brake)</span>
           <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (< 1.5 m)</span>

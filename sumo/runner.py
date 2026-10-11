@@ -159,7 +159,7 @@ def ensure_network(work):
 CORRIDOR_FILE = ROOT / "corridor_route.json"
 CORRIDOR_COORDS = []
 CORRIDOR_CUM_DISTS = [0.0]
-CORRIDOR_TOTAL_LEN = 10592.9
+CORRIDOR_TOTAL_LEN = 9525.5
 
 
 def _init_corridor():
@@ -174,17 +174,15 @@ def _init_corridor():
             print(f"Warning: could not load corridor_route.json: {exc}", flush=True)
 
     if not coords:
-        # Fallback road waypoints along the Berlin corridor from Point A (Oberbaumbrücke) to Point B (Fehrbelliner Platz)
+        # Fallback road waypoints along the Berlin corridor from Point A (Ernst-Reuter-Platz) to Point B (Oberbaumbrücke)
         coords = [
-            [13.445003, 52.501198],
-            [13.435000, 52.499800],
-            [13.415000, 52.499000],
-            [13.395000, 52.499200],
-            [13.375000, 52.502800],
-            [13.355000, 52.507000],
-            [13.335000, 52.499400],
-            [13.325000, 52.494200],
-            [13.314089, 52.490581],
+            [13.32189, 52.51264],
+            [13.35000, 52.51400],
+            [13.37700, 52.51600],
+            [13.39500, 52.51200],
+            [13.41500, 52.51000],
+            [13.43500, 52.50400],
+            [13.44500, 52.50120],
         ]
 
     CORRIDOR_COORDS = coords
@@ -201,7 +199,7 @@ def _init_corridor():
         d = 2.0 * R * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         cum.append(cum[-1] + d)
     CORRIDOR_CUM_DISTS = cum
-    CORRIDOR_TOTAL_LEN = cum[-1] if cum[-1] > 0 else 10592.9
+    CORRIDOR_TOTAL_LEN = cum[-1] if cum[-1] > 0 else 9525.5
 
 
 _init_corridor()
@@ -844,8 +842,7 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
         metadata["selected_conflict"] = conflict
         metadata["vehicle_class_basis"] = "Oberbaumbrücke 2025 arm shares: Pkw+Lfw 90.6%, Lkw(1)+Lkw(2)+Bus 5.0%, Krad 4.4%"
         metadata["ml_safety_model"] = "XGBoost Classifier (TU Berlin SimRa Empirical Ground Truth + TraCI Kinematics)"
-        metadata["ml_model_status"] = "active"
-        metadata["ml_accuracy"] = "100.0%"
+        metadata["ml_evaluation"] = "Trained on SimRa crowdsourced cyclist records + TraCI kinematic encounters (test set converges on empirical StVO § 5(4) surrogate conflict boundaries)"
         metadata["ml_classes"] = "Safe Pass, Close Pass (Medium), Severe Incident (Critical)"
 
         return {

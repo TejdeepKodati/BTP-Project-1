@@ -25,10 +25,10 @@ function tileLayer() {
 
 const STUDY_CORRIDOR = {
   pointA: {
-    name: "Fehrbelliner Platz",
-    area: "Charlottenburg-Wilmersdorf",
-    lat: 52.49063,
-    lon: 13.31418,
+    name: "Ernst-Reuter-Platz",
+    area: "Charlottenburg",
+    lat: 52.51264,
+    lon: 13.32189,
   },
   pointB: {
     name: "Oberbaumbrücke",
@@ -308,11 +308,30 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
     }).bindTooltip("Study corridor route (A → B)", { sticky: true }).addTo(routeLayer);
   }
 
-  // 2. Add Point A (Fehrbelliner Platz) and Point B (Oberbaumbrücke) corridor markers
+  // 2. Add Point A (Ernst-Reuter-Platz) and Point B (Oberbaumbrücke) corridor markers
   addCorridorMarkers(routeLayer);
 
   // 3. Spatially cluster incidents within ~25 meters for precise inspection and hotspot display
-  const incList = incidents || [];
+  let incList = incidents || [];
+  if (counterpartId) {
+    incList = incList.filter((i) => i.counterpart_id === counterpartId);
+  }
+  if (primaryBikeId) {
+    incList = incList.filter((i) => !i.primary_bike_id || i.primary_bike_id === primaryBikeId);
+  }
+
+  // If pair has no flagged incidents but has a recorded closest approach GPS point, display it
+  if (counterpartId && incList.length === 0 && selectedInfo && selectedInfo.lat && selectedInfo.lon) {
+    const isClose = selectedInfo.min_distance_m != null && selectedInfo.min_distance_m < 1.5;
+    const color = isClose ? (themeColor("--amber") || "#f59e0b") : (themeColor("--teal") || "#14b8a6");
+    L.circleMarker([selectedInfo.lat, selectedInfo.lon], {
+      radius: 9,
+      color: "#ffffff",
+      weight: 2.5,
+      fillColor: color,
+      fillOpacity: 0.85,
+    }).bindTooltip(`<strong>${counterpartId}</strong> · Closest clearance: ${selectedInfo.min_distance_m != null ? selectedInfo.min_distance_m.toFixed(2) + ' m' : 'recorded approach'}`).addTo(routeLayer);
+  }
   const clusters = [];
   const visited = new Set();
 
