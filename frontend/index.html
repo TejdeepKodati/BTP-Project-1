@@ -33,7 +33,10 @@
 
     <div class="sidebar-footer">
       <div class="sim-block">
-        <span class="sim-duration-badge">Duration: Fixed 60 minutes</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span class="sim-duration-badge">60-MIN RUN</span>
+          <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Global shortcut</span>
+        </div>
         <button id="simulate-btn" class="btn btn-primary" type="button">
           Run 60-minute simulation
         </button>
@@ -43,7 +46,7 @@
           </div>
           <p id="sim-progress-detail" class="chart-hint" style="margin-top:4px; font-family: var(--font-mono); font-size: 11px;"></p>
         </div>
-        <p class="sim-hint">Simulates full Oberbaumbrücke corridor traffic (~1,200 vehicles). Filter counterpart interactions directly within each ride.</p>
+        <p class="sim-hint">Global trigger: launches 60-min simulation on the controlled 2.0 km prototype network (~1,200 vehicles).</p>
       </div>
 
       <div class="status-row">
@@ -149,15 +152,15 @@
 
       <div class="panel network-banner" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <div class="panel-title">Study corridor</div>
-          <strong>Ernst-Reuter-Platz → Oberbaumbrücke</strong>
-          <p class="chart-hint">Fixed study corridor · approximately 9.5 km by the road router · Germany / right-hand traffic</p>
+          <div class="panel-title">Active simulation network</div>
+          <strong>Controlled Calibration Prototype (2.0 km straight 3-lane test track)</strong>
+          <p class="chart-hint">Calibrated mixed-traffic corridor · Target reference: Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km OSM geometry)</p>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
           <button id="network-simulate-btn" class="btn btn-primary" type="button" style="font-size:13px; font-weight:600;">
             Run 60-minute simulation
           </button>
-          <span class="corridor-badge">FIXED 60 MIN</span>
+          <span class="corridor-badge">PRIMARY SIMULATION ACTION</span>
         </div>
       </div>
 
@@ -172,11 +175,12 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:8px; margin: 12px 0;">
             <div><span style="color:var(--text-muted); font-size:12px;">Duration:</span> <strong>60 minutes (3,600s simulated)</strong></div>
-            <div><span style="color:var(--text-muted); font-size:12px;">Corridor:</span> <strong>Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Active network:</span> <strong>Controlled Calibration Prototype (2.0 km 3-lane linear testbed)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Reference target:</span> <strong>Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km OSM corridor)</strong></div>
             <div><span style="color:var(--text-muted); font-size:12px;">Traffic model:</span> <strong>IDM car-following on right-hand German network</strong></div>
           </div>
           <div class="demand-source-note" id="demand-source-note">
-            <strong>Data basis:</strong> Oberbaumbrücke intersection count, 3 Apr 2025, 07:00–19:00 (13,531 motor vehicles, 1,397 bicycles across 12 hours). The 60-minute run applies a representative stochastic demand model around the normalized hourly baseline.
+            <strong>Data basis &amp; Network scope:</strong> Oberbaumbrücke intersection count, 3 Apr 2025, 07:00–19:00 (13,531 motor vehicles, 1,397 bicycles across 12 hours). Simulation executes on a controlled 2.0 km straight calibration prototype. Incidents and trajectories derive strictly from this micro-corridor rather than real Berlin street coordinates.
           </div>
         </div>
 
@@ -212,9 +216,15 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Study corridor map</div>
+        <div class="panel-title-row">
+          <div>
+            <div class="panel-title">Target reference corridor (OpenStreetMap)</div>
+            <p class="chart-hint">Reference geometry for future network expansion. Active simulation runs on the 2.0 km Controlled Prototype.</p>
+          </div>
+          <span class="corridor-badge">TARGET REFERENCE</span>
+        </div>
         <div id="study-corridor-map-page" class="map-el map-el-corridor-large"></div>
-        <p id="study-corridor-status-page" class="chart-hint">Loading the real road route from OpenStreetMap…</p>
+        <p id="study-corridor-status-page" class="chart-hint">Loading reference road route from OpenStreetMap…</p>
       </div>
 
       <div class="panel network-limitations">
@@ -222,7 +232,7 @@
         <div class="network-list">
           <div class="network-item"><strong>Fixed volume, changing interactions</strong><span>The demand count is held constant for a selected data window; SUMO uses a fresh seed so departure times and resulting encounters can change between runs.</span></div>
           <div class="network-item"><strong>Incidents are not manually prescribed</strong><span>Close passes, hard braking and other detector events come from the simulated trajectories. A “safe pass” is an observed interaction state, not an incident.</span></div>
-          <div class="network-item"><strong>Geometry matters</strong><span>Turn-related events should only be reported where the actual road geometry supports a turn. The current controlled SUMO network is still a prototype and must be replaced/validated against the OSM corridor before geometry-specific claims are made.</span></div>
+          <div class="network-item"><strong>Geometry matters</strong><span>Turn-related events should only be reported where the actual road geometry supports a turn. The current controlled SUMO network is a prototype micro-corridor and must be replaced/validated against the OSM corridor before geometry-specific claims are made.</span></div>
         </div>
       </div>
     </section>
@@ -238,17 +248,17 @@
       <div class="panel panel-map">
         <div class="panel-title-row">
           <div>
-            <div class="panel-title">Ride corridor &amp; conflict locations</div>
-            <p class="chart-hint">Study corridor between Point A and Point B with detected traffic conflicts on this ride.</p>
+            <div class="panel-title" id="ride-map-panel-title">Ride corridor &amp; conflict locations</div>
+            <p class="chart-hint" id="ride-map-panel-sub">Corridor geometry with detected traffic conflicts on this ride.</p>
           </div>
-          <span class="corridor-badge">A &rarr; B CORRIDOR</span>
+          <span class="corridor-badge" id="ride-map-panel-badge">A &rarr; B CORRIDOR</span>
         </div>
         <div id="route-map" class="map-el map-el-tall"></div>
-        <div class="ride-map-legend">
-          <span class="legend-item"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)</span>
-          <span class="legend-item"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
-          <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (< 1.2 m / Hard brake)</span>
-          <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (< 1.5 m)</span>
+        <div class="ride-map-legend" id="ride-map-legend">
+          <span class="legend-item" id="legend-item-a"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)</span>
+          <span class="legend-item" id="legend-item-b"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
+          <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (&lt; 1.2 m / Hard brake)</span>
+          <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (&lt; 1.5 m)</span>
           <span class="legend-item"><span class="legend-dot is-safe"></span>Safe encounter</span>
         </div>
       </div>

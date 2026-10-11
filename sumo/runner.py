@@ -204,51 +204,42 @@ def _init_corridor():
 
 _init_corridor()
 
+# Controlled Prototype Network Calibration Baseline:
+# The controlled SUMO network consists of a straight 2,000 m corridor (west node at x=0, east node at x=2000).
+# Vehicles operate on this 2.0 km prototype track. Their coordinates are projected strictly along
+# this linear calibration corridor from its West anchor, without artificially distorting or stretching
+# onto the 9.53 km Berlin study polyline.
+PROTOTYPE_TRACK_ORIGIN_LAT = 52.51264
+PROTOTYPE_TRACK_ORIGIN_LON = 13.32189
+METERS_PER_DEG_LAT = 111320.0
+METERS_PER_DEG_LON = 111320.0 * math.cos(math.radians(PROTOTYPE_TRACK_ORIGIN_LAT))
 
-def to_geo_distance(dist_m, y=0.0):
-    if not CORRIDOR_COORDS or len(CORRIDOR_COORDS) < 2:
-        return 52.50120, 13.44500
 
-    cycle = 2.0 * CORRIDOR_TOTAL_LEN
-    m = dist_m % cycle
-    d = m if m <= CORRIDOR_TOTAL_LEN else (cycle - m)
-    d = max(0.0, min(CORRIDOR_TOTAL_LEN, d))
-
-    idx = bisect.bisect_right(CORRIDOR_CUM_DISTS, d) - 1
-    idx = max(0, min(idx, len(CORRIDOR_COORDS) - 2))
-
-    seg_d = CORRIDOR_CUM_DISTS[idx + 1] - CORRIDOR_CUM_DISTS[idx]
-    f = 0.0 if seg_d <= 0 else (d - CORRIDOR_CUM_DISTS[idx]) / seg_d
-    f = max(0.0, min(1.0, f))
-
-    p1 = CORRIDOR_COORDS[idx]
-    p2 = CORRIDOR_COORDS[idx + 1]
-    lon = p1[0] + f * (p2[0] - p1[0])
-    lat = p1[1] + f * (p2[1] - p1[1])
-
-    # Add small lateral lane offset perpendicular to segment
-    if y != 0.0:
-        lat_rad = math.radians(lat)
-        dx = (p2[0] - p1[0]) * 111320.0 * math.cos(lat_rad)
-        dy = (p2[1] - p1[1]) * 111320.0
-        seg_len = math.hypot(dx, dy)
-        if seg_len > 0.01:
-            nx = -dy / seg_len
-            ny = dx / seg_len
-            offset_m = max(-3.0, min(3.0, float(y) - 2.5))
-            lat += (offset_m * ny) / 111320.0
-            lon += (offset_m * nx) / (111320.0 * math.cos(lat_rad))
-
+def to_geo(x, y=0.0, edge=None, s=None):
+    """
+    Direct linear projection from the SUMO 2,000 m controlled micro-corridor.
+    Preserves exact 1:1 physical meter distances and lane offsets without
+    projecting synthetic straight edges onto the non-linear Berlin street polyline.
+    """
+    if s is not None and edge is not None:
+        track_x = float(s) if edge == "eastbound" else (2000.0 - float(s))
+    else:
+        track_x = float(x)
+    track_x = max(0.0, min(2000.0, track_x))
+    lat = PROTOTYPE_TRACK_ORIGIN_LAT + (float(y) / METERS_PER_DEG_LAT)
+    lon = PROTOTYPE_TRACK_ORIGIN_LON + (track_x / METERS_PER_DEG_LON)
     return lat, lon
 
 
-def to_geo(x, y, edge=None, s=None):
-    if s is not None and edge is not None:
-        frac = max(0.0, min(1.0, float(s) / 2000.0))
-        d = frac * CORRIDOR_TOTAL_LEN if edge == "westbound" else (1.0 - frac) * CORRIDOR_TOTAL_LEN
-        return to_geo_distance(d, y)
-    frac = max(0.0, min(1.0, float(x) / 2000.0))
-    return to_geo_distance(frac * CORRIDOR_TOTAL_LEN, y)
+def to_geo_distance(dist_m, y=0.0):
+    """
+    Linear distance projection along the 2,000 m controlled test corridor.
+    Traverses the 2.0 km track back and forth according to edge bounds.
+    """
+    cycle = 4000.0
+    m = float(dist_m) % cycle
+    track_x = m if m <= 2000.0 else (cycle - m)
+    return to_geo(track_x, y)
 
 
 def edge_clearance(ego_pos, other_pos, ego_length, other_length, ego_width, other_width):
@@ -840,9 +831,18 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
         metadata["seed"] = seed
         metadata["scenario_id"] = scenario_id
         metadata["selected_conflict"] = conflict
+        metadata["network_type"] = "controlled_prototype_network"
+        metadata["network_name"] = "Controlled Calibration Micro-Corridor (2.0 km Straight Test Track)"
+        metadata["network_length_m"] = 2000.0
+        metadata["real_street_simulation"] = False
+        metadata["corridor_note"] = "Controlled calibration prototype (2.0 km straight 3-lane test track). Not a real-street simulation. Incidents reflect micro-corridor kinematics, not real Berlin street locations."
+        metadata["track_anchors"] = {
+            "west": {"name": "Calibration West Node (0 m)", "lat": PROTOTYPE_TRACK_ORIGIN_LAT, "lon": PROTOTYPE_TRACK_ORIGIN_LON},
+            "east": {"name": "Calibration East Node (2,000 m)", "lat": PROTOTYPE_TRACK_ORIGIN_LAT, "lon": round(PROTOTYPE_TRACK_ORIGIN_LON + (2000.0 / METERS_PER_DEG_LON), 6)},
+        }
         metadata["vehicle_class_basis"] = "Oberbaumbrücke 2025 arm shares: Pkw+Lfw 90.6%, Lkw(1)+Lkw(2)+Bus 5.0%, Krad 4.4%"
         metadata["ml_safety_model"] = "XGBoost Classifier (TU Berlin SimRa Empirical Ground Truth + TraCI Kinematics)"
-        metadata["ml_evaluation"] = "Trained on SimRa crowdsourced cyclist records + TraCI kinematic encounters (test set converges on empirical StVO § 5(4) surrogate conflict boundaries)"
+        metadata["ml_evaluation"] = "Trained on SimRa crowdsourced cyclist records + TraCI kinematic encounters. High test accuracy reflects convergence on deterministic surrogate kinematic boundaries (StVO § 5(4)), not unconstrained human subjective risk."
         metadata["ml_classes"] = "Safe Pass, Close Pass (Medium), Severe Incident (Critical)"
 
         return {

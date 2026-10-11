@@ -67,6 +67,30 @@ function addCorridorMarkers(layer) {
   corridorMarker(STUDY_CORRIDOR.pointB, "B").addTo(layer);
 }
 
+function prototypeTrackMarker(point, label) {
+  const cls = label === "W" ? "corridor-marker-a" : "corridor-marker-b";
+  const icon = L.divIcon({
+    className: "corridor-marker-wrap",
+    html: `<div class="corridor-map-marker ${cls}">${label}</div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+  return L.marker([point.lat, point.lon], {
+    title: `${label} · ${point.name}`,
+    icon,
+  }).bindTooltip(`<strong>${point.name}</strong><br>${point.detail}`, {
+    direction: "top",
+    permanent: false,
+    sticky: true,
+    className: "corridor-label",
+  });
+}
+
+function addPrototypeTrackMarkers(layer) {
+  prototypeTrackMarker({ lat: 52.51264, lon: 13.32189, name: "West Node (0 m)", detail: "Controlled Prototype Track Origin" }, "W").addTo(layer);
+  prototypeTrackMarker({ lat: 52.51264, lon: 13.35140, name: "East Node (2,000 m)", detail: "Controlled Prototype Track Terminal" }, "E").addTo(layer);
+}
+
 async function fetchStudyCorridorRoute() {
   if (studyCorridorRoutePromise) return studyCorridorRoutePromise;
 
@@ -292,8 +316,8 @@ function formatBikeLabel(bikeId) {
   return `Bicycle (${bikeId})`;
 }
 
-/** renderRoute draws (or redraws) one ride's GPS trace, Point A/B markers, and conflict locations. */
-function renderRoute(elementId, points, incidents, counterpartId = null, selectedInfo = null, primaryBikeId = null) {
+/** renderRoute draws (or redraws) one ride's GPS trace, corridor markers, and conflict locations. */
+function renderRoute(elementId, points, incidents, counterpartId = null, selectedInfo = null, primaryBikeId = null, ride = null) {
   if (!routeMap) {
     routeMap = L.map(elementId, { scrollWheelZoom: false }).setView(BERLIN_CENTER, 14);
     tileLayer().addTo(routeMap);
@@ -301,20 +325,29 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
   if (routeLayer) routeMap.removeLayer(routeLayer);
   routeLayer = L.layerGroup();
 
+  const isPrototype = ride && (ride.source === "sumo" || (ride.metadata && ride.metadata.network_type === "controlled_prototype_network"));
+
   // 1. Draw corridor route polyline
   if (points && points.length > 0) {
     const latlngs = points.map((p) => [p.lat, p.lon]);
+    const routeTooltip = isPrototype
+      ? "Controlled Calibration Track (2.0 km straight micro-corridor · Mixed Traffic)"
+      : "Study corridor route (A → B)";
     L.polyline(latlngs, {
       color: themeColor("--teal") || "#14b8a6",
       weight: 4,
       opacity: 0.85,
       lineCap: "round",
       lineJoin: "round",
-    }).bindTooltip("Study corridor route (A → B)", { sticky: true }).addTo(routeLayer);
+    }).bindTooltip(routeTooltip, { sticky: true }).addTo(routeLayer);
   }
 
-  // 2. Add Point A (Ernst-Reuter-Platz) and Point B (Oberbaumbrücke) corridor markers
-  addCorridorMarkers(routeLayer);
+  // 2. Add corridor markers (West/East nodes for prototype track, Point A/B for real study corridor)
+  if (isPrototype) {
+    addPrototypeTrackMarkers(routeLayer);
+  } else {
+    addCorridorMarkers(routeLayer);
+  }
 
   // 3. Spatially cluster incidents within ~25 meters for precise inspection and hotspot display
   let incList = incidents || [];
@@ -460,15 +493,20 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
 
   routeLayer.addTo(routeMap);
 
-  // 5. Fit bounds to include Point A, Point B, and points
-  const bounds = [
-    [STUDY_CORRIDOR.pointA.lat, STUDY_CORRIDOR.pointA.lon],
-    [STUDY_CORRIDOR.pointB.lat, STUDY_CORRIDOR.pointB.lon],
-  ];
+  // 5. Fit bounds to corridor geometry and ride points
+  const bounds = isPrototype
+    ? [
+        [52.51264, 13.32189],
+        [52.51264, 13.35140],
+      ]
+    : [
+        [STUDY_CORRIDOR.pointA.lat, STUDY_CORRIDOR.pointA.lon],
+        [STUDY_CORRIDOR.pointB.lat, STUDY_CORRIDOR.pointB.lon],
+      ];
   if (points && points.length > 0) {
     points.forEach((p) => bounds.push([p.lat, p.lon]));
   }
-  routeMap.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+  routeMap.fitBounds(bounds, { padding: [28, 28], maxZoom: isPrototype ? 15 : 14 });
   setTimeout(() => routeMap.invalidateSize(), 50);
 }
 

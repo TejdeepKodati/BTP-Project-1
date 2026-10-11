@@ -188,7 +188,28 @@ document.addEventListener("DOMContentLoaded", () => {
       window.__lastInteractions = interactions;
       window.__selectedEncounterSamples = null;
 
-      renderRoute("route-map", points, incidents);
+      const isPrototype = ride.source === "sumo" || (ride.metadata && ride.metadata.network_type === "controlled_prototype_network");
+      const mapTitle = document.getElementById("ride-map-panel-title");
+      const mapSub = document.getElementById("ride-map-panel-sub");
+      const mapBadge = document.getElementById("ride-map-panel-badge");
+      const legA = document.getElementById("legend-item-a");
+      const legB = document.getElementById("legend-item-b");
+
+      if (isPrototype) {
+        if (mapTitle) mapTitle.textContent = "Controlled 2.0 km Prototype Track & Conflict Locations";
+        if (mapSub) mapSub.textContent = "Controlled 2.0 km linear calibration track · Prototype simulation, not real Berlin street locations.";
+        if (mapBadge) { mapBadge.textContent = "2.0 km PROTOTYPE TRACK"; mapBadge.className = "corridor-badge corridor-badge-variable"; }
+        if (legA) legA.innerHTML = '<span class="legend-dot is-point-a"></span><strong>Node W:</strong> West Anchor (0 m)';
+        if (legB) legB.innerHTML = '<span class="legend-dot is-point-b"></span><strong>Node E:</strong> East Anchor (2,000 m)';
+      } else {
+        if (mapTitle) mapTitle.textContent = "Ride corridor & conflict locations";
+        if (mapSub) mapSub.textContent = "Study corridor between Point A and Point B with detected traffic conflicts on this ride.";
+        if (mapBadge) { mapBadge.textContent = "A → B CORRIDOR"; mapBadge.className = "corridor-badge"; }
+        if (legA) legA.innerHTML = '<span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)';
+        if (legB) legB.innerHTML = '<span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)';
+      }
+
+      renderRoute("route-map", points, incidents, null, null, null, ride);
       renderRideConflictSummary(incidents, interactions);
       renderInteractionControls(points, incidents, interactions, ride);
       renderGyroChart(document.getElementById("gyro-chart"), points);
@@ -205,16 +226,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const medium = incidents.filter((i) => i.severity === "medium").length;
     const categories = [...new Set(incidents.map((i) => i.conflict_category).filter(Boolean))].map(humanize);
     const areas = incidents.map((i) => `${i.lat.toFixed(4)}, ${i.lon.toFixed(4)}`);
-    const weighted = incidents.reduce((sum, i) => sum + (i.severity === "high" ? 3 : i.severity === "medium" ? 2 : 1), 0);
-    const rideScore = incidents.length ? Math.max(0, Math.round(100 * Math.exp(-weighted / 18))) : 100;
+    const conflictStatus = incidents.length === 0
+      ? "No conflicts detected"
+      : high > 0
+      ? `${high} critical conflict${high === 1 ? "" : "s"}`
+      : `${medium} close pass${medium === 1 ? "" : "es"}`;
+
     el.innerHTML = `
-      <div class="interaction-card"><span>Recorded counterpart pairs</span><strong>${interactions.length}</strong></div>
-      <div class="interaction-card"><span>Flagged interactions</span><strong>${incidents.length}</strong></div>
-      <div class="interaction-card"><span>High / medium</span><strong>${high} / ${medium}</strong></div>
-      <div class="interaction-card"><span>Ride safety score</span><strong>${rideScore}/100</strong></div>
+      <div class="interaction-card"><span>Evaluated counterpart pairs</span><strong>${interactions.length}</strong></div>
+      <div class="interaction-card"><span>Total flagged conflicts</span><strong>${incidents.length}</strong></div>
+      <div class="interaction-card"><span>Critical / Close pass</span><strong>${high} / ${medium}</strong></div>
+      <div class="interaction-card"><span>Conflict status</span><strong>${conflictStatus}</strong></div>
       <div class="interaction-card"><span>Conflict types</span><strong>${categories.length ? categories.join(", ") : "None"}</strong></div>`;
     area.textContent = areas.length
-      ? `Conflict areas recorded on this ride: ${[...new Set(areas)].slice(0, 8).join(" · ")}${areas.length > 8 ? " · …" : ""}. Selecting a counterpart below filters the map and charts to that pair.`
+      ? `Conflict locations recorded on this ride: ${[...new Set(areas)].slice(0, 8).join(" · ")}${areas.length > 8 ? " · …" : ""}. Selecting a counterpart below filters the map and charts to that pair.`
       : "No flagged conflict areas were recorded on this ride.";
   }
 
@@ -419,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.__selectedEncounterSamples = null;
         renderAccelChart(document.getElementById("accel-chart"), points, null);
         renderProximityChart(document.getElementById("proximity-chart"), points, null);
-        renderRoute("route-map", points, [], null, null, primaryId);
+        renderRoute("route-map", points, [], null, null, primaryId, ride);
         return;
       }
 
@@ -430,53 +455,89 @@ document.addEventListener("DOMContentLoaded", () => {
       const pairIncidents = incidents.filter((i) => i.counterpart_id === counterpartId && (!i.primary_bike_id || i.primary_bike_id === primaryId));
       renderIncidentsTable(pairIncidents);
 
-      const hasConflict = pairIncidents.length > 0 || (selected.status && (selected.status.includes("high") || selected.status.includes("medium")));
-      const distance = pairIncidents.length
-        ? Math.min(...pairIncidents.map((i) => i.magnitude))
-        : selected.min_distance_m;
+      const hasConflict = pairIncidents.length > 0 || (selected.status && (
+        selected.status.toLowerCase().includes("high") ||
+        selected.status.toLowerCase().includes("medium") ||
+        selected.status.toLowerCase().includes("braking") ||
+        selected.status.toLowerCase().includes("close")
+      ));
 
-      // Honest safety score derived from actual interaction physics
-      let score = 100;
-      if (selected.high_count > 0) {
-        score = Math.max(10, 100 - selected.high_count * 25 - selected.medium_count * 10);
-      } else if (selected.medium_count > 0) {
-        score = Math.max(40, 100 - selected.medium_count * 12);
-      } else if (distance < 1.5) {
-        score = Math.max(60, Math.round(50 + (distance / 1.5) * 40));
+      const samples = selected.samples || [];
+      const closestSample = samples.length > 0
+        ? samples.reduce((best, s) => (s.distance_m != null && (best == null || s.distance_m < best.distance_m) ? s : best), null)
+        : null;
+
+      const rawDist = closestSample && closestSample.distance_m != null
+        ? closestSample.distance_m
+        : (pairIncidents.length ? Math.min(...pairIncidents.map((i) => i.magnitude)) : selected.min_distance_m);
+
+      const hasValidDist = rawDist != null && rawDist > 0 && rawDist < 900;
+      const distanceText = hasValidDist ? `${rawDist.toFixed(2)} m` : "—";
+
+      const timeVal = closestSample && closestSample.time_s != null ? closestSample.time_s : selected.closest_time_s;
+      const timeText = timeVal != null ? `T+${timeVal.toFixed(1)}s` : "";
+
+      const egoSpd = closestSample && closestSample.ego_speed != null ? closestSample.ego_speed : selected.ego_speed_m_s;
+      const cpSpd = closestSample && closestSample.counterpart_speed != null ? closestSample.counterpart_speed : selected.counterpart_speed_m_s;
+      const egoAcc = closestSample && closestSample.ego_accel != null ? closestSample.ego_accel : selected.ego_accel_m_s2;
+
+      // 3 mutually exclusive encounter evaluation states
+      let encounterState = "insufficient_telemetry";
+      let statusBadge = "";
+      let stvoStatus = "Insufficient data";
+      let evidenceText = "";
+
+      if (hasConflict) {
+        encounterState = "detected_conflict";
+        const isSevere = selected.high_count > 0 || pairIncidents.some((i) => i.severity === "high") || (rawDist != null && rawDist < 1.2);
+        statusBadge = `<span class="severity-pill severity-${isSevere ? 'high' : 'medium'}">${isSevere ? 'Critical Conflict' : 'Close Pass'}</span>`;
+        stvoStatus = isSevere ? "Non-compliant (< 1.20 m)" : "Below threshold (< 1.50 m)";
+
+        if (pairIncidents.length > 0) {
+          evidenceText = pairIncidents.map((i) => i.evidence ? `${i.evidence} [${i.magnitude.toFixed(2)} m]` : `Clearance ${i.magnitude.toFixed(2)} m below threshold`).join(" · ");
+        } else if (hasValidDist) {
+          evidenceText = `Closest lateral clearance of ${distanceText}${timeText ? ' at ' + timeText : ''}`;
+          if (egoSpd != null) evidenceText += ` (ego speed: ${egoSpd.toFixed(1)} m/s`;
+          if (cpSpd != null) evidenceText += `, counterpart: ${cpSpd.toFixed(1)} m/s`;
+          if (egoAcc != null) evidenceText += `, deceleration: ${egoAcc.toFixed(2)} m/s²`;
+          evidenceText += `). Clearance is below the 1.50 m German StVO § 5(4) passing threshold.`;
+        } else {
+          evidenceText = `Conflict threshold triggered based on counterpart trajectory proximity.`;
+        }
+
+        if (selected.ml_probabilities && selected.ml_confidence) {
+          evidenceText += ` · [XGBoost ML: ${humanize(selected.status)} (${(selected.ml_confidence * 100).toFixed(1)}% prob)]`;
+        }
+      } else if (samples.length > 0 || hasValidDist) {
+        encounterState = "evaluated_safe";
+        statusBadge = `<span class="severity-pill severity-low">Safe Encounter</span>`;
+        stvoStatus = "Compliant (≥ 1.50 m maintained)";
+        evidenceText = `Evaluated pair encounter: lateral separation remained at or above 1.50 m throughout the interaction (closest recorded clearance: ${distanceText}${timeText ? ' at ' + timeText : ''}`;
+        if (egoSpd != null) evidenceText += ` · ego speed: ${egoSpd.toFixed(1)} m/s`;
+        if (cpSpd != null) evidenceText += ` · counterpart speed: ${cpSpd.toFixed(1)} m/s`;
+        evidenceText += `). No conflict triggered under German StVO § 5(4).`;
       } else {
-        score = Math.min(100, Math.round(85 + Math.min(15, (distance - 1.5) * 10)));
-      }
-
-      const statusSlug = (selected.status || "safe-encounter").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const distanceText = `${distance.toFixed(2)} m`;
-
-      let evidenceText = selected.evidence || "";
-      if (!evidenceText && pairIncidents.length > 0) {
-        evidenceText = pairIncidents.map((i) => i.evidence).filter(Boolean).join(" · ");
-      }
-      if (!evidenceText) {
-        const mlPrefix = selected.ml_confidence
-          ? `[XGBoost ML · ${(selected.ml_confidence * 100).toFixed(1)}% conf] `
-          : "";
-        const spd = selected.samples && selected.samples[0] ? (selected.samples[0].counterpart_speed || 0).toFixed(1) : "0.0";
-        evidenceText = `${mlPrefix}Trajectory record confirms closest clearance of ${distanceText} with counterpart speed of ${spd} m/s.`;
+        encounterState = "insufficient_telemetry";
+        statusBadge = `<span class="interaction-status">Insufficient Telemetry</span>`;
+        stvoStatus = "No interaction recorded";
+        evidenceText = `No spatial proximity encounter recorded between ${primaryLabel} and ${counterpartLabel} in this simulation run.`;
       }
 
       panel.innerHTML = `
         <div class="interaction-summary">
           <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status ${statusSlug}">${humanize(selected.status)}</span></strong></div>
+          <div class="interaction-card"><span>Encounter evaluation</span><strong>${statusBadge}</strong></div>
           <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
-          <div class="interaction-card"><span>Pair safety score</span><strong>${Math.round(score)}/100</strong></div>
+          <div class="interaction-card"><span>StVO § 5(4) status</span><strong>${stvoStatus}</strong></div>
         </div>
         <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
-          <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}
+          <strong>Physical Telemetry Evidence:</strong> ${evidenceText}
         </div>`;
 
-      window.__selectedEncounterSamples = selected.samples || null;
-      renderAccelChart(document.getElementById("accel-chart"), points, selected.samples);
-      renderProximityChart(document.getElementById("proximity-chart"), points, selected.samples);
-      renderRoute("route-map", points, pairIncidents, counterpartId, selected, primaryId);
+      window.__selectedEncounterSamples = samples.length > 0 ? samples : null;
+      renderAccelChart(document.getElementById("accel-chart"), points, samples);
+      renderProximityChart(document.getElementById("proximity-chart"), points, samples);
+      renderRoute("route-map", points, pairIncidents, counterpartId, selected, primaryId, ride);
     }
 
     bikeSelect.onchange = () => {
@@ -584,7 +645,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  let isSimulating = false;
+
   async function onSimulateClick() {
+    if (isSimulating) {
+      console.warn("Simulation already running; duplicate launch prevented.");
+      return;
+    }
+    isSimulating = true;
     const btn = document.getElementById("simulate-btn");
     const netBtn = document.getElementById("network-simulate-btn");
     if (btn) btn.disabled = true;
@@ -617,6 +685,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus("error", "Simulation failed");
       showToast(err.message, true);
     } finally {
+      isSimulating = false;
       if (btn) btn.disabled = false;
       if (netBtn) netBtn.disabled = false;
       setTimeout(() => {

@@ -84,8 +84,14 @@
   "test_samples": 305,
   "simra_sources_included": true,
   "evaluation_methodology": "80/20 train/test stratified split on 1,524 samples combining Berlin SimRa crowdsourced cyclist records with TraCI synthetic surrogate safety kinematic encounters.",
-  "accuracy_interpretation": "The high test score (1.0 on test partition) reflects the tree ensemble successfully internalizing deterministic physical kinematic thresholds (StVO § 5(4) lateral clearance < 1.2m, emergency braking < -2.5 m/s², TTC < 1.5s). It demonstrates model fidelity to the kinematic surrogate conflict boundaries rather than unconstrained subjective human risk perception.",
+  "accuracy_interpretation": "CAUTION: The 100% test accuracy is an artifact of synthetic-label partitioning where labels were generated using non-overlapping kinematic intervals (clearance < 1.02 m, 1.05–1.49 m, >= 1.52 m; decel < -2.4 m/s²). The test partition evaluates rule-boundary reconstruction fidelity rather than independent real-world predictive validity. It demonstrates that the gradient boosted decision trees perfectly learned the deterministic surrogate conflict rules, but MUST NOT be claimed as 100% real-world cyclist safety predictive accuracy.",
+  "synthetic_label_leakage": {
+    "detected": true,
+    "root_cause": "Deterministic threshold boundaries in synthetic encounter generator resulted in separable feature intervals across the 3 classes.",
+    "scientific_scope": "Surrogate safety rule boundary convergence; not an empirical proof of real-world subjective risk perception."
+  },
   "limitations": [
+    "Test partition measures surrogate threshold rule reconstruction rather than independent real-world prediction.",
     "SimRa crowdsourced dataset lacks continuous LIDAR/radar lateral distance sensors; lateral clearance in SimRa traces was derived from ultrasonic sensor readings where available or calibrated synthetic proxy.",
     "Model operates on macroscopic kinematic features (clearance, speed, deceleration, TTC); unmodeled environmental factors (road surface condition, weather, lighting) are not captured."
   ]
