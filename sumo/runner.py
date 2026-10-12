@@ -136,16 +136,15 @@ CONTROLLED_VEHICLE_TYPES = """<vType id="bike" vClass="bicycle" accel="1.2" dece
 <vType id="motorbike" vClass="motorcycle" accel="3.0" decel="5.0" length="2.2" width="0.9" minGap="0.6" maxSpeed="14.0" guiShape="motorcycle"/>
 <vType id="truck" vClass="truck" accel="1.3" decel="4.0" length="7.1" width="2.4" minGap="1.2" maxSpeed="12.0" guiShape="truck"/>"""
 
-MULTI_VEHICLE_TYPES = """<vType id="bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="7.0" desiredMaxSpeed="7.0" guiShape="bicycle" carFollowModel="IDM" tau="1.2"/>
+MULTI_VEHICLE_TYPES = """<vType id="ego_bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="2.67" desiredMaxSpeed="2.67" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0"/>
+<vType id="bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="7.0" desiredMaxSpeed="7.0" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0"/>
 <vType id="car" vClass="passenger" accel="2.6" decel="4.5" length="4.5" width="1.8" minGap="0.8" maxSpeed="15.0" desiredMaxSpeed="15.0" guiShape="passenger/sedan" carFollowModel="IDM" tau="1.2"/>
 <vType id="motorbike" vClass="motorcycle" accel="3.0" decel="5.0" length="2.2" width="0.9" minGap="0.6" maxSpeed="14.0" desiredMaxSpeed="14.0" guiShape="motorcycle" carFollowModel="IDM" tau="1.0"/>
 <vType id="truck" vClass="truck" accel="1.3" decel="4.0" length="7.1" width="2.4" minGap="1.2" maxSpeed="12.0" desiredMaxSpeed="12.0" guiShape="truck" carFollowModel="IDM" tau="1.5"/>"""
 
 
 def ensure_network(work):
-    net = ROOT / "network.net.xml"
-    if net.exists():
-        return net
+    net = work / "network.net.xml"
     cmd = [
         "netconvert",
         "--node-files", str(ROOT / "nodes.nod.xml"),
@@ -210,10 +209,7 @@ def to_geo_distance(dist_m, y=0.0):
     if not CORRIDOR_COORDS or len(CORRIDOR_COORDS) < 2:
         return 52.50120, 13.44500
 
-    cycle = 2.0 * CORRIDOR_TOTAL_LEN
-    m = dist_m % cycle
-    d = m if m <= CORRIDOR_TOTAL_LEN else (cycle - m)
-    d = max(0.0, min(CORRIDOR_TOTAL_LEN, d))
+    d = max(0.0, min(CORRIDOR_TOTAL_LEN, float(dist_m)))
 
     idx = bisect.bisect_right(CORRIDOR_CUM_DISTS, d) - 1
     idx = max(0, min(idx, len(CORRIDOR_COORDS) - 2))
@@ -245,10 +241,10 @@ def to_geo_distance(dist_m, y=0.0):
 
 def to_geo(x, y, edge=None, s=None):
     if s is not None and edge is not None:
-        frac = max(0.0, min(1.0, float(s) / 2000.0))
-        d = frac * CORRIDOR_TOTAL_LEN if edge == "westbound" else (1.0 - frac) * CORRIDOR_TOTAL_LEN
+        frac = max(0.0, min(1.0, float(s) / CORRIDOR_TOTAL_LEN))
+        d = (1.0 - frac) * CORRIDOR_TOTAL_LEN if edge == "westbound" else frac * CORRIDOR_TOTAL_LEN
         return to_geo_distance(d, y)
-    frac = max(0.0, min(1.0, float(x) / 2000.0))
+    frac = max(0.0, min(1.0, float(x) / CORRIDOR_TOTAL_LEN))
     return to_geo_distance(frac * CORRIDOR_TOTAL_LEN, y)
 
 
@@ -285,12 +281,9 @@ def make_multi_routes(seed=None):
     trucks = demand["heavy_duty"]
     kfz = demand["motor_vehicles_total"]
 
-    # The compact validation corridor is reused repeatedly in both directions.
-    # Vehicles therefore remain in the simulation long enough to participate
-    # in the full 60-minute demand experiment instead of leaving after one pass.
-    loop_pairs = 24  # 48 traversals = 96 km total route length.
-    east_route = " ".join(["eastbound", "westbound"] * loop_pairs)
-    west_route = " ".join(["westbound", "eastbound"] * loop_pairs)
+    # Traversal follows the full Ernst-Reuter-Platz -> Oberbaumbrücke corridor (9.6 km).
+    east_route = "eastbound"
+    west_route = "westbound"
 
     vehicles = []
     ego_id = "ego_bicycle"
@@ -299,15 +292,15 @@ def make_multi_routes(seed=None):
         raise RuntimeError("multi-traffic demand produced zero bicycles")
 
     # The ego is the instrumented bicycle and starts at t=0 so its complete
-    # one-hour trace is observable. The remaining bicycles are ordinary traffic
-    # generated from the measured demand reference.
-    vehicles.append((ego_id, "bike", east_route, 1, 0.0, 4.5))
+    # one-hour traversal across the 9.6 km corridor is observable.
+    ego_speed = 2.67  # 9,613.9 m / 3,600 s = 2.67 m/s (progresses smoothly across the 9.61 km corridor throughout the 60-min window)
+    vehicles.append((ego_id, "ego_bike", east_route, 1, 0.0, ego_speed))
     for i, depart in enumerate(bike_departures, start=1):
         vid = f"bike_{i:04d}"
         direction = "eastbound" if i % 2 == 0 else "westbound"
         route = east_route if direction == "eastbound" else west_route
-        lane = 1 if (vid == ego_id or rng.random() < 0.65) else 0
-        speed = 4.5 if vid == ego_id else rng.uniform(3.8, 6.0)
+        lane = 1 if rng.random() < 0.65 else 0
+        speed = rng.uniform(3.5, 5.0)
         vehicles.append((vid, "bike", route, lane, depart, speed))
 
     for prefix, vtype, count, min_speed, max_speed in [
@@ -318,10 +311,10 @@ def make_multi_routes(seed=None):
         for i, depart in enumerate(random_departures(rng, count, SIM_END)):
             direction = "eastbound" if rng.random() < 0.5 else "westbound"
             route = east_route if direction == "eastbound" else west_route
-            # Mixed-lane traffic stays in the adjacent left lane; overtaking is
-            # an emergent consequence of different speeds and demand, not a
-            # scripted incident.
-            lane = 2
+            # Real-world German Rechtsfahrgebot distribution:
+            # 65% depart in the primary mixed right lane (lane 1),
+            # 35% depart in the overtaking left lane (lane 2).
+            lane = 1 if rng.random() < 0.65 else 2
             speed = rng.uniform(min_speed, max_speed)
             vehicles.append((f"{prefix}_{i:04d}", vtype, route, lane, depart, speed))
 
@@ -349,8 +342,7 @@ def make_multi_routes(seed=None):
         "kfz_total": kfz,
         "demand_basis": "12-hour observed Oberbaumbrücke arm total (13,531 motor vehicles, 1,397 bicycles) converted to 60-min stochastic demand",
         "observed_window": BERLIN_REFERENCE["observed_window"],
-        "route_loop_pairs": loop_pairs,
-        "route_distance_km": loop_pairs * 4.0,
+        "route_distance_km": round(CORRIDOR_TOTAL_LEN / 1000.0, 2),
     }
 
 
@@ -570,7 +562,13 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
                     width = candidate["width"]
                     if is_multi:
                         proximity = edge_clearance(ego_pos, pos, ego_length, length, ego_width, width)
-                        side = "same-lane" if lane == ego_lane else ("left" if lane > ego_lane else "right")
+                        dy_offset = pos[1] - ego_pos[1]
+                        if dy_offset > 0.35:
+                            side = "left"
+                        elif dy_offset < -0.35:
+                            side = "right"
+                        else:
+                            side = "same-lane"
                     elif lane == ego_lane:
                         proximity = same_lane_gap("ego_bicycle", vid)
                         side = "same-lane"
@@ -719,7 +717,8 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
                             candidate_types[vid] = v_type
 
                             prox = edge_clearance(b_pos, pos, ego_length, v_len, ego_width, v_wid)
-                            side = "same-lane" if v_lane == b_lane else ("left" if v_lane > b_lane else "right")
+                            b_dy_offset = pos[1] - b_pos[1]
+                            side = "left" if b_dy_offset > 0.35 else ("right" if b_dy_offset < -0.35 else "same-lane")
                             if prox <= 35.0:
                                 if vid not in multi_bike_encounters[bid]:
                                     multi_bike_encounters[bid][vid] = []
@@ -745,7 +744,7 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
         if is_multi:
             metadata.update({
                 "engine": "Eclipse SUMO 1.27.1",
-                "network": "Cyclesafe controlled Berlin-anchored validation corridor with repeated bidirectional route",
+                "network": "Cyclesafe Berlin Ernst-Reuter-Platz to Oberbaumbrücke study corridor (9.6 km)",
                 "behaviour_model": "IDM car-following model configured for all vehicle classes",
                 "traffic_generation": "fixed data-derived demand count with randomized reproducible departures; incidents are not predefined",
                 "traffic_reference": json.dumps(BERLIN_REFERENCE, separators=(",", ":")),

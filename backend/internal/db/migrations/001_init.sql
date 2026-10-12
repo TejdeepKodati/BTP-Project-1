@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_incidents_ride_id ON incidents (ride_id);
+
 CREATE INDEX IF NOT EXISTS idx_incidents_ride ON incidents (ride_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_location ON incidents (lat, lon);
 
