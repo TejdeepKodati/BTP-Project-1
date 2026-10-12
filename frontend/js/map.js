@@ -69,6 +69,18 @@ function addCorridorMarkers(layer) {
 
 async function fetchStudyCorridorRoute() {
   if (studyCorridorRoutePromise) return studyCorridorRoutePromise;
+
+  if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
+    studyCorridorRoutePromise = Promise.resolve({
+      latlngs: window.BUNDLED_CORRIDOR_ROUTE.latlngs,
+      distanceM: window.BUNDLED_CORRIDOR_ROUTE.distanceM,
+      source: "OpenStreetMap road routing (bundled)",
+      approximate: false,
+    });
+    studyCorridorRoute = await studyCorridorRoutePromise;
+    return studyCorridorRoute;
+  }
+
   const a = STUDY_CORRIDOR.pointA;
   const b = STUDY_CORRIDOR.pointB;
   const waypoints = [a, b].map((point) => `${point.lon},${point.lat}`).join(";");
@@ -98,14 +110,6 @@ async function fetchStudyCorridorRoute() {
       } finally {
         clearTimeout(timeout);
       }
-    }
-    if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
-      return {
-        latlngs: window.BUNDLED_CORRIDOR_ROUTE.latlngs,
-        distanceM: window.BUNDLED_CORRIDOR_ROUTE.distanceM,
-        source: "OpenStreetMap road routing (bundled)",
-        approximate: false,
-      };
     }
     return {
       latlngs: [],
@@ -176,7 +180,7 @@ function renderVariableCorridorMap(elementId, buckets) {
   if (variableMapLayer) variableMap.removeLayer(variableMapLayer);
   variableMapLayer = L.layerGroup();
 
-  const path = studyCorridorRoute?.latlngs || [];
+  const path = studyCorridorRoute?.latlngs || window.BUNDLED_CORRIDOR_ROUTE?.latlngs || [];
   if (path.length) {
     L.polyline(path, {
       color: "#ffffff", weight: 9, opacity: 0.70, lineCap: "round", lineJoin: "round",

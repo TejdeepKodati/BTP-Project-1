@@ -176,12 +176,13 @@ def _init_corridor():
     if not coords:
         # Fallback road waypoints along the Berlin corridor from Point A (Ernst-Reuter-Platz) to Point B (Oberbaumbrücke)
         coords = [
-            [13.32189, 52.51264],
-            [13.35000, 52.51400],
-            [13.37700, 52.51600],
-            [13.39500, 52.51200],
-            [13.41500, 52.51000],
-            [13.43500, 52.50400],
+            [13.32186, 52.51320],
+            [13.34939, 52.50314],
+            [13.37138, 52.50487],
+            [13.37928, 52.49890],
+            [13.39489, 52.49765],
+            [13.41233, 52.49853],
+            [13.43393, 52.49960],
             [13.44500, 52.50120],
         ]
 
@@ -199,7 +200,7 @@ def _init_corridor():
         d = 2.0 * R * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         cum.append(cum[-1] + d)
     CORRIDOR_CUM_DISTS = cum
-    CORRIDOR_TOTAL_LEN = cum[-1] if cum[-1] > 0 else 10592.9
+    CORRIDOR_TOTAL_LEN = cum[-1] if cum[-1] > 0 else 9613.9
 
 
 _init_corridor()
