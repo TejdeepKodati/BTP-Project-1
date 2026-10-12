@@ -271,6 +271,16 @@ def random_departures(rng, count, duration):
     return sorted(rng.uniform(0.0, max(0.0, duration - 1.0)) for _ in range(count))
 
 
+CORRIDOR_CONFLICT_ZONES = [
+    (500.0, 680.0),    # Ernst-Reuter-Platz junction exit / pinch point (~180m)
+    (2200.0, 2380.0),  # Großer Stern roundabout transition (~180m)
+    (4050.0, 4230.0),  # Potsdamer Platz intersection transition (~180m)
+    (5650.0, 5830.0),  # Leipziger Straße mixed bottleneck (~180m)
+    (7150.0, 7330.0),  # Spittelmarkt / Moritzplatz junction (~180m)
+    (8650.0, 8830.0),  # Warschauer Straße / Oberbaumbrücke ramp (~180m)
+]
+
+
 def make_multi_routes(seed=None):
     run_seed = int(seed if seed is not None else random.randint(10000000, 99999999))
     demand = sample_demand(run_seed)
@@ -294,12 +304,12 @@ def make_multi_routes(seed=None):
     # The ego is the instrumented bicycle and starts at t=0 so its complete
     # one-hour traversal across the 9.6 km corridor is observable.
     ego_speed = 2.67  # 9,613.9 m / 3,600 s = 2.67 m/s (progresses smoothly across the 9.61 km corridor throughout the 60-min window)
-    vehicles.append((ego_id, "ego_bike", east_route, 1, 0.0, ego_speed))
+    vehicles.append((ego_id, "ego_bike", east_route, 0, 0.0, ego_speed))
     for i, depart in enumerate(bike_departures, start=1):
         vid = f"bike_{i:04d}"
         direction = "eastbound" if i % 2 == 0 else "westbound"
         route = east_route if direction == "eastbound" else west_route
-        lane = 1 if rng.random() < 0.65 else 0
+        lane = 1 if rng.random() < 0.25 else 0
         speed = rng.uniform(3.5, 5.0)
         vehicles.append((vid, "bike", route, lane, depart, speed))
 
@@ -517,6 +527,15 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
                 dt = STEP_LENGTH if is_multi else 0.1
                 ego_cum_dist += max(0.0, float(ego_speed)) * dt
                 lat, lon = to_geo_distance(ego_cum_dist, y=ego_pos[1])
+
+                if is_multi:
+                    in_conflict = any(start <= ego_s <= end for start, end in CORRIDOR_CONFLICT_ZONES)
+                    target_lane = 1 if in_conflict else 0
+                    if ego_lane != target_lane:
+                        try:
+                            traci.vehicle.changeLane("ego_bicycle", target_lane, 5.0)
+                        except Exception:
+                            pass
 
                 best = None
 

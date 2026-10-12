@@ -203,8 +203,8 @@ function renderVariableCorridorMap(elementId, buckets) {
         b.low_count ? `${b.low_count} low` : null,
       ].filter(Boolean).join(" · ");
       L.circleMarker([b.lat, b.lon], {
-        radius: 7 + weight * 18,
-        color, weight: 2, fillColor: color, fillOpacity: 0.28 + weight * 0.45,
+        radius: 6 + weight * 8,
+        color, weight: 1.5, fillColor: color, fillOpacity: 0.35 + weight * 0.35,
       }).bindTooltip(`${b.count} incident${b.count === 1 ? "" : "s"} · ${breakdown}`).addTo(variableMapLayer);
     });
   }
@@ -255,7 +255,7 @@ function renderHeatmap(elementId, buckets) {
   const bounds = [];
   buckets.forEach((b) => {
     const weight = b.count / maxCount; // 0..1
-    const radius = 7 + weight * 20;
+    const radius = 6 + weight * 9;
     const color = severityColor(dominantSeverity(b));
     const breakdown = [
       b.high_count ? `${b.high_count} high` : null,
@@ -265,9 +265,9 @@ function renderHeatmap(elementId, buckets) {
     L.circleMarker([b.lat, b.lon], {
       radius,
       color,
-      weight: 1,
+      weight: 1.5,
       fillColor: color,
-      fillOpacity: 0.3 + weight * 0.45,
+      fillOpacity: 0.35 + weight * 0.35,
     })
       .bindTooltip(`${b.count} incident${b.count === 1 ? "" : "s"} near here — ${breakdown}`)
       .addTo(heatmapLayer);
@@ -315,7 +315,7 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
   // 2. Add Point A (Ernst-Reuter-Platz) and Point B (Oberbaumbrücke) corridor markers
   addCorridorMarkers(routeLayer);
 
-  // 3. Spatially cluster incidents within ~25 meters for precise inspection and hotspot display
+  // 3. Spatially cluster incidents within ~120 meters for clean, distinct conflict hotspot display
   const incList = incidents || [];
   const clusters = [];
   const visited = new Set();
@@ -330,7 +330,7 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
         const dLat = (inc.lat - otherInc.lat) * 111320;
         const dLon = (inc.lon - otherInc.lon) * 111320 * Math.cos((inc.lat * Math.PI) / 180);
         const distM = Math.sqrt(dLat * dLat + dLon * dLon);
-        if (distM <= 25.0) {
+        if (distM <= 120.0) {
           cluster.push(otherInc);
           visited.add(otherIdx);
         }
@@ -346,13 +346,13 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
     const hasSevere = cluster.some((c) => c.severity === "high");
 
     const baseColor = hasSevere ? (themeColor("--danger") || "#ef4444") : (themeColor("--amber") || "#f59e0b");
-    const radius = isSelected ? 12 : (hasSevere ? (cluster.length > 1 ? 10 : 8) : (cluster.length > 1 ? 9 : 7));
-    const weight = isSelected ? 3 : (cluster.length > 1 ? 2.5 : 1.5);
-    const opacity = isOther ? 0.35 : (hasSevere ? 0.9 : 0.8);
+    const radius = isSelected ? 11 : (cluster.length > 1 ? 8 : 6);
+    const weight = isSelected ? 3 : 1.5;
+    const opacity = isOther ? 0.35 : 0.88;
 
     const marker = L.circleMarker([primaryInc.lat, primaryInc.lon], {
       radius,
-      color: isSelected ? "#ffffff" : baseColor,
+      color: isSelected ? "#ffffff" : "#0f172a",
       weight,
       fillColor: baseColor,
       fillOpacity: opacity,
