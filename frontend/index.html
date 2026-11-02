@@ -225,9 +225,16 @@
     <!-- ---------------- Ride detail ---------------- -->
     <section id="view-ride-detail" class="view" hidden>
       <header class="view-header">
-        <button id="back-to-rides" class="link-btn" type="button">&larr; All rides</button>
-        <h1 id="ride-detail-title">Ride</h1>
-        <p class="view-sub" id="ride-detail-sub"></p>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+          <div>
+            <button id="back-to-rides" class="link-btn" type="button">&larr; All rides</button>
+            <h1 id="ride-detail-title">Ride</h1>
+            <p class="view-sub" id="ride-detail-sub"></p>
+          </div>
+          <button id="export-ride-csv-btn" class="btn btn-secondary" type="button" style="align-self:center; font-size:13px; padding:6px 14px;">
+            📥 Export Telemetry (CSV)
+          </button>
+        </div>
       </header>
 
       <div class="panel panel-map">

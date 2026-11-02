@@ -16,6 +16,8 @@ TYPE_MAPPING = {
     "bike": 0,
     "bicycle": 0,
     "car": 1,
+    "car_moderate": 1,
+    "car_lane2_right": 1,
     "passenger": 1,
     "delivery": 1,
     "taxi": 1,
@@ -26,6 +28,7 @@ TYPE_MAPPING = {
     "motorcycle": 3,
     "motorbike": 3,
     "moto": 3,
+    "moto_moderate": 3,
     "vehicle": 1,
     "multiple": 1,
 }

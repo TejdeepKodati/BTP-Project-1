@@ -183,8 +183,11 @@ func checkClosePass(rideID string, p models.RidePoint) (models.Incident, bool) {
 	// Bicycles passing each other on a 2.0m segregated cycle track have normal
 	// non-conflicting clearances between 0.8m and 1.5m.
 	if p.CounterpartAgentType == "bike" || p.CounterpartAgentType == "bicycle" {
-		if *best < 0.45 {
+		if *best < 0.28 {
 			return proximityIncident(rideID, p, *best, "close_pass")
+		}
+		if *best < 0.48 {
+			return newIncident(rideID, p, "close_pass", "medium", *best), true
 		}
 		return models.Incident{}, false
 	}

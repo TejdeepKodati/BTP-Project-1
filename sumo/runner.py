@@ -136,10 +136,13 @@ CONTROLLED_VEHICLE_TYPES = """<vType id="bike" vClass="bicycle" accel="1.2" dece
 <vType id="motorbike" vClass="motorcycle" accel="3.0" decel="5.0" length="2.2" width="0.9" minGap="0.6" maxSpeed="14.0" guiShape="motorcycle"/>
 <vType id="truck" vClass="truck" accel="1.3" decel="4.0" length="7.1" width="2.4" minGap="1.2" maxSpeed="12.0" guiShape="truck"/>"""
 
-MULTI_VEHICLE_TYPES = """<vType id="ego_bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="2.67" desiredMaxSpeed="2.67" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0"/>
-<vType id="bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="7.0" desiredMaxSpeed="7.0" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0"/>
+MULTI_VEHICLE_TYPES = """<vType id="ego_bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="2.67" desiredMaxSpeed="2.67" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0" latAlignment="right"/>
+<vType id="bike" vClass="bicycle" accel="1.2" decel="3.0" length="1.6" width="0.65" minGap="0.5" maxSpeed="7.0" desiredMaxSpeed="7.0" guiShape="bicycle" carFollowModel="IDM" tau="1.2" lcKeepRight="0" latAlignment="right"/>
 <vType id="car" vClass="passenger" accel="2.6" decel="4.5" length="4.5" width="1.8" minGap="0.8" maxSpeed="15.0" desiredMaxSpeed="15.0" guiShape="passenger/sedan" carFollowModel="IDM" tau="1.2"/>
+<vType id="car_moderate" vClass="passenger" accel="2.6" decel="4.5" length="4.5" width="1.8" minGap="0.8" maxSpeed="15.0" desiredMaxSpeed="15.0" guiShape="passenger/sedan" carFollowModel="IDM" tau="1.2" latAlignment="left"/>
+<vType id="car_lane2_right" vClass="passenger" accel="2.6" decel="4.5" length="4.5" width="1.8" minGap="0.8" maxSpeed="15.0" desiredMaxSpeed="15.0" guiShape="passenger/sedan" carFollowModel="IDM" tau="1.2" latAlignment="right"/>
 <vType id="motorbike" vClass="motorcycle" accel="3.0" decel="5.0" length="2.2" width="0.9" minGap="0.6" maxSpeed="14.0" desiredMaxSpeed="14.0" guiShape="motorcycle" carFollowModel="IDM" tau="1.0"/>
+<vType id="moto_moderate" vClass="motorcycle" accel="3.0" decel="5.0" length="2.2" width="0.9" minGap="0.6" maxSpeed="14.0" desiredMaxSpeed="14.0" guiShape="motorcycle" carFollowModel="IDM" tau="1.0" latAlignment="left"/>
 <vType id="truck" vClass="truck" accel="1.3" decel="4.0" length="7.1" width="2.4" minGap="1.2" maxSpeed="12.0" desiredMaxSpeed="12.0" guiShape="truck" carFollowModel="IDM" tau="1.5"/>"""
 
 
@@ -313,7 +316,7 @@ def make_multi_routes(seed=None):
         speed = rng.uniform(3.5, 5.0)
         vehicles.append((vid, "bike", route, lane, depart, speed))
 
-    for prefix, vtype, count, min_speed, max_speed in [
+    for prefix, base_vtype, count, min_speed, max_speed in [
         ("car", "car", cars, 8.0, 13.5),
         ("moto", "motorbike", motorbikes, 8.5, 13.0),
         ("truck", "truck", trucks, 7.0, 11.0),
@@ -322,9 +325,18 @@ def make_multi_routes(seed=None):
             direction = "eastbound" if rng.random() < 0.5 else "westbound"
             route = east_route if direction == "eastbound" else west_route
             # Real-world German Rechtsfahrgebot distribution:
-            # 65% depart in the primary mixed right lane (lane 1),
-            # 35% depart in the overtaking left lane (lane 2).
+            # 65% depart in primary mixed right lane (lane 1), 35% in passing lane (lane 2).
             lane = 1 if rng.random() < 0.65 else 2
+            vtype = base_vtype
+            if direction == "eastbound":
+                r_type = rng.random()
+                if base_vtype == "car":
+                    if lane == 1 and r_type < 0.35:
+                        vtype = "car_moderate"
+                    elif lane == 2 and r_type < 0.12:
+                        vtype = "car_lane2_right"
+                elif base_vtype == "motorbike" and lane == 1 and r_type < 0.35:
+                    vtype = "moto_moderate"
             speed = rng.uniform(min_speed, max_speed)
             vehicles.append((f"{prefix}_{i:04d}", vtype, route, lane, depart, speed))
 
@@ -382,12 +394,16 @@ SCENARIOS = {
 
 
 def pair_conflict_category(counterpart_type):
-    return {
-        "bike": "bicycle-bicycle",
-        "car": "bicycle-car",
-        "motorbike": "bicycle-motorbike",
-        "truck": "bicycle-heavy-duty",
-    }.get(counterpart_type, "multi-traffic")
+    ct = str(counterpart_type).lower()
+    if "bike" in ct or "bicycle" in ct:
+        return "bicycle-bicycle"
+    if "car" in ct or "passenger" in ct:
+        return "bicycle-car"
+    if "moto" in ct:
+        return "bicycle-motorbike"
+    if "truck" in ct or "bus" in ct or "heavy" in ct:
+        return "bicycle-heavy-duty"
+    return "multi-traffic"
 
 
 def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_window="07:00-08:00", progress_cb=None):
@@ -423,7 +439,7 @@ def run_scenario(scenario_id, seed=None, conflict="bicycle-bicycle", demand_wind
 
         command = [SUMO_BIN, "-c", str(cfg), "--seed", str(seed)]
         if is_multi:
-            command += ["--lateral-resolution", "0.5"]
+            command += ["--lateral-resolution", "0.2"]
 
         traci.start(command, label="cyclesafe")
         points = []

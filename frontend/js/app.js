@@ -47,6 +47,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => resetChartZoom(btn.dataset.resetZoom));
   });
 
+  const exportCsvBtn = document.getElementById("export-ride-csv-btn");
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener("click", () => {
+      if (!window.__lastPoints || !window.__lastPoints.length) {
+        showToast("No telemetry points loaded to export.", true);
+        return;
+      }
+      exportRideCSV(window.__lastRide, window.__lastPoints, window.__lastIncidents, window.__lastInteractions);
+    });
+  }
+
   // -------------------------------------------------------------------
   // Formatting helpers
   // -------------------------------------------------------------------
@@ -181,6 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("ride-detail-sub").textContent =
         `${formatKm(ride.distance_m)} km · ${points.length} samples · ${incidents.length} incident${incidents.length === 1 ? "" : "s"} flagged · source: ${ride.source}${seedText}`;
 
+      window.__lastRide = ride;
       window.__lastPoints = points;
       window.__lastIncidents = incidents;
       window.__lastInteractions = interactions;
@@ -722,4 +734,84 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial data load
   loadOverview();
   loadAllRides();
+
+  // -------------------------------------------------------------------
+  // Telemetry CSV Export
+  // -------------------------------------------------------------------
+  function exportRideCSV(ride, points, incidents, interactions) {
+    const incMap = new Map();
+    (incidents || []).forEach((inc) => {
+      if (inc.point_id) incMap.set(inc.point_id, inc);
+    });
+
+    const headers = [
+      "seq",
+      "recorded_at",
+      "lat",
+      "lon",
+      "accel_x",
+      "accel_y",
+      "accel_z",
+      "gyro_a",
+      "gyro_b",
+      "gyro_c",
+      "lin_accel_x",
+      "lin_accel_y",
+      "lin_accel_z",
+      "obs_dist_left_m",
+      "obs_dist_right_m",
+      "obs_dist_same_lane_m",
+      "incident_type",
+      "incident_severity",
+      "incident_magnitude_m",
+      "counterpart_id",
+      "counterpart_type",
+      "evidence"
+    ];
+
+    const rows = [headers.join(",")];
+
+    points.forEach((pt) => {
+      const inc = incMap.get(pt.id) || {};
+      const row = [
+        pt.seq != null ? pt.seq : "",
+        JSON.stringify(pt.recorded_at || ""),
+        pt.lat != null ? pt.lat.toFixed(6) : "",
+        pt.lon != null ? pt.lon.toFixed(6) : "",
+        pt.accel_x != null ? pt.accel_x.toFixed(4) : "",
+        pt.accel_y != null ? pt.accel_y.toFixed(4) : "",
+        pt.accel_z != null ? pt.accel_z.toFixed(4) : "",
+        pt.gyro_a != null ? pt.gyro_a.toFixed(4) : "",
+        pt.gyro_b != null ? pt.gyro_b.toFixed(4) : "",
+        pt.gyro_c != null ? pt.gyro_c.toFixed(4) : "",
+        pt.lin_accel_x != null ? pt.lin_accel_x.toFixed(4) : "",
+        pt.lin_accel_y != null ? pt.lin_accel_y.toFixed(4) : "",
+        pt.lin_accel_z != null ? pt.lin_accel_z.toFixed(4) : "",
+        pt.obs_dist_left_m != null ? pt.obs_dist_left_m.toFixed(2) : "",
+        pt.obs_dist_right_m != null ? pt.obs_dist_right_m.toFixed(2) : "",
+        pt.obs_dist_same_lane_m != null ? pt.obs_dist_same_lane_m.toFixed(2) : "",
+        JSON.stringify(inc.incident_type || pt.conflict_category || ""),
+        JSON.stringify(inc.severity || ""),
+        inc.magnitude != null ? inc.magnitude.toFixed(2) : "",
+        JSON.stringify(inc.counterpart_id || pt.counterpart_id || ""),
+        JSON.stringify(inc.counterpart_agent_type || pt.counterpart_agent_type || ""),
+        JSON.stringify(inc.evidence || "")
+      ];
+      rows.push(row.join(","));
+    });
+
+    const csvContent = rows.join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const rideId = ride ? ride.id.slice(0, 8) : "telemetry";
+    link.setAttribute("href", url);
+    link.setAttribute("download", `cyclesafe_ride_${rideId}_telemetry.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Ride telemetry exported to CSV successfully!");
+  }
+
 });
