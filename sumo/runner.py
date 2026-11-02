@@ -248,19 +248,6 @@ def to_geo_distance(dist_m, y=0.0):
             lat += (offset_m * ny) / 111320.0
             lon += (offset_m * nx) / (111320.0 * math.cos(lat_rad))
 
-def to_geo(x, y=0.0, edge=None, s=None):
-    """
-    Direct linear projection from the SUMO 2,000 m controlled micro-corridor.
-    Preserves exact 1:1 physical meter distances and lane offsets without
-    projecting synthetic straight edges onto the non-linear Berlin street polyline.
-    """
-    if s is not None and edge is not None:
-        track_x = float(s) if edge == "eastbound" else (2000.0 - float(s))
-    else:
-        track_x = float(x)
-    track_x = max(0.0, min(2000.0, track_x))
-    lat = PROTOTYPE_TRACK_ORIGIN_LAT + (float(y) / METERS_PER_DEG_LAT)
-    lon = PROTOTYPE_TRACK_ORIGIN_LON + (track_x / METERS_PER_DEG_LON)
     return lat, lon
 
 
