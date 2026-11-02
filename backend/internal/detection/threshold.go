@@ -178,6 +178,19 @@ func checkClosePass(rideID string, p models.RidePoint) (models.Incident, bool) {
 	if best == nil {
 		return models.Incident{}, false
 	}
+	// Under German StVO § 5 Abs. 4 Satz 3, the 1.50 m minimum passing clearance
+	// strictly governs motor vehicles (Kraftfahrzeuge) overtaking cyclists.
+	// Bicycles passing each other on a 2.0m segregated cycle track have normal
+	// non-conflicting clearances between 0.8m and 1.5m.
+	if p.CounterpartAgentType == "bike" || p.CounterpartAgentType == "bicycle" {
+		if *best < 0.28 {
+			return proximityIncident(rideID, p, *best, "close_pass")
+		}
+		if *best < 0.48 {
+			return newIncident(rideID, p, "close_pass", "medium", *best), true
+		}
+		return models.Incident{}, false
+	}
 	return proximityIncident(rideID, p, *best, "close_pass")
 }
 

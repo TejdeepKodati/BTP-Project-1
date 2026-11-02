@@ -105,7 +105,7 @@
           <div class="map-caption">
             <span><strong>Point A:</strong> Ernst-Reuter-Platz area</span>
             <span><strong>Point B:</strong> Oberbaumbrücke</span>
-            <span><strong>Target:</strong> ≈ 9.5 km by road</span>
+            <span><strong>Target:</strong> ≈ 9.6 km by road</span>
           </div>
         </div>
 
@@ -152,15 +152,9 @@
 
       <div class="panel network-banner" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <div class="panel-title">Active simulation network</div>
-          <strong>Controlled Calibration Prototype (2.0 km straight 3-lane test track)</strong>
-          <p class="chart-hint">Calibrated mixed-traffic corridor · Target reference: Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km OSM geometry)</p>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <button id="network-simulate-btn" class="btn btn-primary" type="button" style="font-size:13px; font-weight:600;">
-            Run 60-minute simulation
-          </button>
-          <span class="corridor-badge">PRIMARY SIMULATION ACTION</span>
+          <div class="panel-title">Study corridor</div>
+          <strong>Ernst-Reuter-Platz → Oberbaumbrücke</strong>
+          <p class="chart-hint">Fixed study corridor · approximately 9.6 km by the road router · Germany / right-hand traffic</p>
         </div>
       </div>
 
@@ -175,8 +169,7 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:8px; margin: 12px 0;">
             <div><span style="color:var(--text-muted); font-size:12px;">Duration:</span> <strong>60 minutes (3,600s simulated)</strong></div>
-            <div><span style="color:var(--text-muted); font-size:12px;">Active network:</span> <strong>Controlled Calibration Prototype (2.0 km 3-lane linear testbed)</strong></div>
-            <div><span style="color:var(--text-muted); font-size:12px;">Reference target:</span> <strong>Ernst-Reuter-Platz → Oberbaumbrücke (9.5 km OSM corridor)</strong></div>
+            <div><span style="color:var(--text-muted); font-size:12px;">Corridor:</span> <strong>Ernst-Reuter-Platz → Oberbaumbrücke (~9.6 km)</strong></div>
             <div><span style="color:var(--text-muted); font-size:12px;">Traffic model:</span> <strong>IDM car-following on right-hand German network</strong></div>
           </div>
           <div class="demand-source-note" id="demand-source-note">
@@ -240,9 +233,16 @@
     <!-- ---------------- Ride detail ---------------- -->
     <section id="view-ride-detail" class="view" hidden>
       <header class="view-header">
-        <button id="back-to-rides" class="link-btn" type="button">&larr; All rides</button>
-        <h1 id="ride-detail-title">Ride</h1>
-        <p class="view-sub" id="ride-detail-sub"></p>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+          <div>
+            <button id="back-to-rides" class="link-btn" type="button">&larr; All rides</button>
+            <h1 id="ride-detail-title">Ride</h1>
+            <p class="view-sub" id="ride-detail-sub"></p>
+          </div>
+          <button id="export-ride-csv-btn" class="btn btn-secondary" type="button" style="align-self:center; font-size:13px; padding:6px 14px;">
+            📥 Export Telemetry (CSV)
+          </button>
+        </div>
       </header>
 
       <div class="panel panel-map">
@@ -254,11 +254,11 @@
           <span class="corridor-badge" id="ride-map-panel-badge">A &rarr; B CORRIDOR</span>
         </div>
         <div id="route-map" class="map-el map-el-tall"></div>
-        <div class="ride-map-legend" id="ride-map-legend">
-          <span class="legend-item" id="legend-item-a"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)</span>
-          <span class="legend-item" id="legend-item-b"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
-          <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (&lt; 1.2 m / Hard brake)</span>
-          <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (&lt; 1.5 m)</span>
+        <div class="ride-map-legend">
+          <span class="legend-item"><span class="legend-dot is-point-a"></span><strong>Point A:</strong> Ernst-Reuter-Platz (Start)</span>
+          <span class="legend-item"><span class="legend-dot is-point-b"></span><strong>Point B:</strong> Oberbaumbrücke (End)</span>
+          <span class="legend-item"><span class="legend-dot is-severe"></span>Severe incident (< 1.2 m / Hard brake)</span>
+          <span class="legend-item"><span class="legend-dot is-close"></span>Close pass (< 1.5 m)</span>
           <span class="legend-item"><span class="legend-dot is-safe"></span>Safe encounter</span>
         </div>
       </div>

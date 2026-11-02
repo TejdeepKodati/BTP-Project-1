@@ -49,6 +49,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => resetChartZoom(btn.dataset.resetZoom));
   });
 
+  const exportCsvBtn = document.getElementById("export-ride-csv-btn");
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener("click", () => {
+      if (!window.__lastPoints || !window.__lastPoints.length) {
+        showToast("No telemetry points loaded to export.", true);
+        return;
+      }
+      exportRideCSV(window.__lastRide, window.__lastPoints, window.__lastIncidents, window.__lastInteractions);
+    });
+  }
+
   // -------------------------------------------------------------------
   // Formatting helpers
   // -------------------------------------------------------------------
@@ -183,6 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("ride-detail-sub").textContent =
         `${formatKm(ride.distance_m)} km · ${points.length} samples · ${incidents.length} incident${incidents.length === 1 ? "" : "s"} flagged · source: ${ride.source}${seedText}`;
 
+      window.__lastRide = ride;
       window.__lastPoints = points;
       window.__lastIncidents = incidents;
       window.__lastInteractions = interactions;
@@ -396,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return agentTypeMatchesFamily(item, activeFamily);
       });
 
-      // Sort: actual conflicts first (severe first), then close passes, then safe passes by distance
+      // Sort: actual conflicts first (severe first), then close passes, then safe passes, then no interaction
       filtered.sort((a, b) => {
         if (b.incident_count !== a.incident_count) return b.incident_count - a.incident_count;
         if (b.high_count !== a.high_count) return b.high_count - a.high_count;
@@ -424,7 +436,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const nameLabel = item.counterpart_id.startsWith("bike") ? (knownBikes.get(item.counterpart_id) || item.counterpart_id) : item.counterpart_id;
 
         if (item.incident_count > 0 || (item.status && (item.status.includes("high") || item.status.includes("medium")))) {
-          opt.textContent = `⚠️ [${typeLabel}] ${nameLabel} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
+          const distStr = item.min_distance_m >= 900 ? "outside corridor" : `${item.min_distance_m.toFixed(2)} m`;
+          opt.textContent = `⚠️ [${typeLabel}] ${item.counterpart_id} · ${humanize(item.status)} (${distStr})`;
+        } else if (item.min_distance_m < 900 && item.min_distance_m > 0) {
+          opt.textContent = `✓ [${typeLabel}] ${item.counterpart_id} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
         } else {
           opt.textContent = `✓ [${typeLabel}] ${nameLabel} · ${humanize(item.status)} (${item.min_distance_m.toFixed(2)} m)`;
         }
@@ -451,9 +466,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const counterpartId = selected.counterpart_id;
       const counterpartLabel = counterpartId.startsWith("bike") ? (knownBikes.get(counterpartId) || counterpartId) : `${prettyAgentType(selected.counterpart_agent_type)} · ${counterpartId}`;
 
-      // Strictly pair-specific incidents
-      const pairIncidents = incidents.filter((i) => i.counterpart_id === counterpartId && (!i.primary_bike_id || i.primary_bike_id === primaryId));
-      renderIncidentsTable(pairIncidents);
+      // Case 1: Same bicycle selected in both dropdowns
+      if (isSelf) {
+        panel.innerHTML = `
+          <div class="interaction-summary">
+            <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
+            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status no-interaction">Identical bicycle</span></strong></div>
+            <div class="interaction-card"><span>Closest clearance</span><strong>—</strong></div>
+            <div class="interaction-card"><span>StVO § 5(4) status</span><strong>N/A (Self-pair excluded)</strong></div>
+          </div>
+          <div class="pair-evidence-box">
+            <strong>Physics &amp; Trajectory Evidence:</strong> Both selectors reference the same vehicle instance (${primaryId}). A vehicle cannot collide or conflict with itself. Self-interaction excluded from encounter evaluation.
+          </div>`;
+        window.__selectedEncounterSamples = null;
+        renderAccelChart(document.getElementById("accel-chart"), points, null);
+        renderProximityChart(document.getElementById("proximity-chart"), points, null);
+        renderRoute("route-map", points, filteredIncidents, null, null, primaryId);
+        return;
+      }
 
       const hasConflict = pairIncidents.length > 0 || (selected.status && (
         selected.status.toLowerCase().includes("high") ||
@@ -462,10 +492,14 @@ document.addEventListener("DOMContentLoaded", () => {
         selected.status.toLowerCase().includes("close")
       ));
 
-      const samples = selected.samples || [];
-      const closestSample = samples.length > 0
-        ? samples.reduce((best, s) => (s.distance_m != null && (best == null || s.distance_m < best.distance_m) ? s : best), null)
-        : null;
+      if (hasConflict || hasEncounter) {
+        const distance = pairIncidents.length
+          ? Math.min(...pairIncidents.map((i) => i.magnitude))
+          : selected.min_distance_m;
+
+        const stvoStatus = distance != null && distance < 1.50
+          ? "Below threshold (< 1.50 m)"
+          : "Compliant (≥ 1.50 m)";
 
       const rawDist = closestSample && closestSample.distance_m != null
         ? closestSample.distance_m
@@ -505,30 +539,35 @@ document.addEventListener("DOMContentLoaded", () => {
           evidenceText = `Conflict threshold triggered based on counterpart trajectory proximity.`;
         }
 
-        if (selected.ml_probabilities && selected.ml_confidence) {
-          evidenceText += ` · [XGBoost ML: ${humanize(selected.status)} (${(selected.ml_confidence * 100).toFixed(1)}% prob)]`;
+        let mlEvidence = "";
+        if (selected.ml_confidence && selected.status) {
+          mlEvidence = ` · [XGBoost ML: ${humanize(selected.status)} (${(selected.ml_confidence * 100).toFixed(1)}% prob)]`;
         }
-      } else if (samples.length > 0 || hasValidDist) {
-        encounterState = "evaluated_safe";
-        statusBadge = `<span class="severity-pill severity-low">Safe Encounter</span>`;
-        stvoStatus = "Compliant (≥ 1.50 m maintained)";
-        evidenceText = `Evaluated pair encounter: lateral separation remained at or above 1.50 m throughout the interaction (closest recorded clearance: ${distanceText}${timeText ? ' at ' + timeText : ''}`;
-        if (egoSpd != null) evidenceText += ` · ego speed: ${egoSpd.toFixed(1)} m/s`;
-        if (cpSpd != null) evidenceText += ` · counterpart speed: ${cpSpd.toFixed(1)} m/s`;
-        evidenceText += `). No conflict triggered under German StVO § 5(4).`;
-      } else {
-        encounterState = "insufficient_telemetry";
-        statusBadge = `<span class="interaction-status">Insufficient Telemetry</span>`;
-        stvoStatus = "No interaction recorded";
-        evidenceText = `No spatial proximity encounter recorded between ${primaryLabel} and ${counterpartLabel} in this simulation run.`;
+
+        panel.innerHTML = `
+          <div class="interaction-summary">
+            <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
+            <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status ${statusSlug}">${humanize(selected.status)}</span></strong></div>
+            <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
+            <div class="interaction-card"><span>StVO § 5(4) status</span><strong>${stvoStatus}</strong></div>
+          </div>
+          <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
+            <strong>Physics &amp; Trajectory Evidence:</strong> ${evidenceText}${mlEvidence}
+          </div>`;
+
+        window.__selectedEncounterSamples = selected.samples || null;
+        renderAccelChart(document.getElementById("accel-chart"), points, selected.samples);
+        renderProximityChart(document.getElementById("proximity-chart"), points, selected.samples);
+        renderRoute("route-map", points, filteredIncidents, counterpartId, selected, primaryId);
+        return;
       }
 
       panel.innerHTML = `
         <div class="interaction-summary">
           <div class="interaction-card"><span>Selected pair</span><strong>${primaryLabel} ↔ ${counterpartLabel}</strong></div>
-          <div class="interaction-card"><span>Encounter evaluation</span><strong>${statusBadge}</strong></div>
-          <div class="interaction-card"><span>Closest clearance</span><strong>${distanceText}</strong></div>
-          <div class="interaction-card"><span>StVO § 5(4) status</span><strong>${stvoStatus}</strong></div>
+          <div class="interaction-card"><span>Interaction outcome</span><strong><span class="interaction-status safe-pass">Safe Separation</span></strong></div>
+          <div class="interaction-card"><span>Closest clearance</span><strong>No close approach (> 1.50 m)</strong></div>
+          <div class="interaction-card"><span>StVO § 5(4) status</span><strong>Compliant (≥ 1.50 m maintained)</strong></div>
         </div>
         <div class="pair-evidence-box ${hasConflict ? "is-conflict" : ""}">
           <strong>Physical Telemetry Evidence:</strong> ${evidenceText}
@@ -698,4 +737,84 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial data load
   loadOverview();
   loadAllRides();
+
+  // -------------------------------------------------------------------
+  // Telemetry CSV Export
+  // -------------------------------------------------------------------
+  function exportRideCSV(ride, points, incidents, interactions) {
+    const incMap = new Map();
+    (incidents || []).forEach((inc) => {
+      if (inc.point_id) incMap.set(inc.point_id, inc);
+    });
+
+    const headers = [
+      "seq",
+      "recorded_at",
+      "lat",
+      "lon",
+      "accel_x",
+      "accel_y",
+      "accel_z",
+      "gyro_a",
+      "gyro_b",
+      "gyro_c",
+      "lin_accel_x",
+      "lin_accel_y",
+      "lin_accel_z",
+      "obs_dist_left_m",
+      "obs_dist_right_m",
+      "obs_dist_same_lane_m",
+      "incident_type",
+      "incident_severity",
+      "incident_magnitude_m",
+      "counterpart_id",
+      "counterpart_type",
+      "evidence"
+    ];
+
+    const rows = [headers.join(",")];
+
+    points.forEach((pt) => {
+      const inc = incMap.get(pt.id) || {};
+      const row = [
+        pt.seq != null ? pt.seq : "",
+        JSON.stringify(pt.recorded_at || ""),
+        pt.lat != null ? pt.lat.toFixed(6) : "",
+        pt.lon != null ? pt.lon.toFixed(6) : "",
+        pt.accel_x != null ? pt.accel_x.toFixed(4) : "",
+        pt.accel_y != null ? pt.accel_y.toFixed(4) : "",
+        pt.accel_z != null ? pt.accel_z.toFixed(4) : "",
+        pt.gyro_a != null ? pt.gyro_a.toFixed(4) : "",
+        pt.gyro_b != null ? pt.gyro_b.toFixed(4) : "",
+        pt.gyro_c != null ? pt.gyro_c.toFixed(4) : "",
+        pt.lin_accel_x != null ? pt.lin_accel_x.toFixed(4) : "",
+        pt.lin_accel_y != null ? pt.lin_accel_y.toFixed(4) : "",
+        pt.lin_accel_z != null ? pt.lin_accel_z.toFixed(4) : "",
+        pt.obs_dist_left_m != null ? pt.obs_dist_left_m.toFixed(2) : "",
+        pt.obs_dist_right_m != null ? pt.obs_dist_right_m.toFixed(2) : "",
+        pt.obs_dist_same_lane_m != null ? pt.obs_dist_same_lane_m.toFixed(2) : "",
+        JSON.stringify(inc.incident_type || pt.conflict_category || ""),
+        JSON.stringify(inc.severity || ""),
+        inc.magnitude != null ? inc.magnitude.toFixed(2) : "",
+        JSON.stringify(inc.counterpart_id || pt.counterpart_id || ""),
+        JSON.stringify(inc.counterpart_agent_type || pt.counterpart_agent_type || ""),
+        JSON.stringify(inc.evidence || "")
+      ];
+      rows.push(row.join(","));
+    });
+
+    const csvContent = rows.join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const rideId = ride ? ride.id.slice(0, 8) : "telemetry";
+    link.setAttribute("href", url);
+    link.setAttribute("download", `cyclesafe_ride_${rideId}_telemetry.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Ride telemetry exported to CSV successfully!");
+  }
+
 });

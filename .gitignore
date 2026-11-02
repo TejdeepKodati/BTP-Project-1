@@ -72,3 +72,10 @@ desktop.ini
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Local working and reference directories
+scratch/
+issues/
+meetings/
+references/
+

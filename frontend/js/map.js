@@ -94,6 +94,25 @@ function addPrototypeTrackMarkers(layer) {
 async function fetchStudyCorridorRoute() {
   if (studyCorridorRoutePromise) return studyCorridorRoutePromise;
 
+  if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
+    studyCorridorRoutePromise = Promise.resolve({
+      latlngs: window.BUNDLED_CORRIDOR_ROUTE.latlngs,
+      distanceM: window.BUNDLED_CORRIDOR_ROUTE.distanceM,
+      source: "OpenStreetMap road routing (bundled)",
+      approximate: false,
+    });
+    studyCorridorRoute = await studyCorridorRoutePromise;
+    return studyCorridorRoute;
+  }
+
+  const a = STUDY_CORRIDOR.pointA;
+  const b = STUDY_CORRIDOR.pointB;
+  const waypoints = [a, b].map((point) => `${point.lon},${point.lat}`).join(";");
+  const endpoints = [
+    `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
+    `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=false`,
+  ];
+
   studyCorridorRoutePromise = (async () => {
     // 1. Prefer the canonical bundled bicycle route shared with SUMO runner
     if (window.BUNDLED_CORRIDOR_ROUTE && window.BUNDLED_CORRIDOR_ROUTE.latlngs?.length) {
@@ -135,7 +154,6 @@ async function fetchStudyCorridorRoute() {
         clearTimeout(timeout);
       }
     }
-
     return {
       latlngs: [],
       distanceM: 0,
@@ -228,8 +246,8 @@ function renderVariableCorridorMap(elementId, buckets) {
         b.low_count ? `${b.low_count} low` : null,
       ].filter(Boolean).join(" · ");
       L.circleMarker([b.lat, b.lon], {
-        radius: 7 + weight * 18,
-        color, weight: 2, fillColor: color, fillOpacity: 0.28 + weight * 0.45,
+        radius: 6 + weight * 8,
+        color, weight: 1.5, fillColor: color, fillOpacity: 0.35 + weight * 0.35,
       }).bindTooltip(`${b.count} incident${b.count === 1 ? "" : "s"} · ${breakdown}`).addTo(variableMapLayer);
     });
   }
@@ -280,7 +298,7 @@ function renderHeatmap(elementId, buckets) {
   const bounds = [];
   buckets.forEach((b) => {
     const weight = b.count / maxCount; // 0..1
-    const radius = 7 + weight * 20;
+    const radius = 6 + weight * 9;
     const color = severityColor(dominantSeverity(b));
     const breakdown = [
       b.high_count ? `${b.high_count} high` : null,
@@ -290,9 +308,9 @@ function renderHeatmap(elementId, buckets) {
     L.circleMarker([b.lat, b.lon], {
       radius,
       color,
-      weight: 1,
+      weight: 1.5,
       fillColor: color,
-      fillOpacity: 0.3 + weight * 0.45,
+      fillOpacity: 0.35 + weight * 0.35,
     })
       .bindTooltip(`${b.count} incident${b.count === 1 ? "" : "s"} near here — ${breakdown}`)
       .addTo(heatmapLayer);
@@ -342,34 +360,11 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
     }).bindTooltip(routeTooltip, { sticky: true }).addTo(routeLayer);
   }
 
-  // 2. Add corridor markers (West/East nodes for prototype track, Point A/B for real study corridor)
-  if (isPrototype) {
-    addPrototypeTrackMarkers(routeLayer);
-  } else {
-    addCorridorMarkers(routeLayer);
-  }
+  // 2. Add Point A (Ernst-Reuter-Platz) and Point B (Oberbaumbrücke) corridor markers
+  addCorridorMarkers(routeLayer);
 
-  // 3. Spatially cluster incidents within ~25 meters for precise inspection and hotspot display
-  let incList = incidents || [];
-  if (counterpartId) {
-    incList = incList.filter((i) => i.counterpart_id === counterpartId);
-  }
-  if (primaryBikeId) {
-    incList = incList.filter((i) => !i.primary_bike_id || i.primary_bike_id === primaryBikeId);
-  }
-
-  // If pair has no flagged incidents but has a recorded closest approach GPS point, display it
-  if (counterpartId && incList.length === 0 && selectedInfo && selectedInfo.lat && selectedInfo.lon) {
-    const isClose = selectedInfo.min_distance_m != null && selectedInfo.min_distance_m < 1.5;
-    const color = isClose ? (themeColor("--amber") || "#f59e0b") : (themeColor("--teal") || "#14b8a6");
-    L.circleMarker([selectedInfo.lat, selectedInfo.lon], {
-      radius: 9,
-      color: "#ffffff",
-      weight: 2.5,
-      fillColor: color,
-      fillOpacity: 0.85,
-    }).bindTooltip(`<strong>${counterpartId}</strong> · Closest clearance: ${selectedInfo.min_distance_m != null ? selectedInfo.min_distance_m.toFixed(2) + ' m' : 'recorded approach'}`).addTo(routeLayer);
-  }
+  // 3. Spatially cluster incidents within ~120 meters for clean, distinct conflict hotspot display
+  const incList = incidents || [];
   const clusters = [];
   const visited = new Set();
 
@@ -383,7 +378,7 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
         const dLat = (inc.lat - otherInc.lat) * 111320;
         const dLon = (inc.lon - otherInc.lon) * 111320 * Math.cos((inc.lat * Math.PI) / 180);
         const distM = Math.sqrt(dLat * dLat + dLon * dLon);
-        if (distM <= 25.0) {
+        if (distM <= 120.0) {
           cluster.push(otherInc);
           visited.add(otherIdx);
         }
@@ -399,13 +394,13 @@ function renderRoute(elementId, points, incidents, counterpartId = null, selecte
     const hasSevere = cluster.some((c) => c.severity === "high");
 
     const baseColor = hasSevere ? (themeColor("--danger") || "#ef4444") : (themeColor("--amber") || "#f59e0b");
-    const radius = isSelected ? 12 : (hasSevere ? (cluster.length > 1 ? 10 : 8) : (cluster.length > 1 ? 9 : 7));
-    const weight = isSelected ? 3 : (cluster.length > 1 ? 2.5 : 1.5);
-    const opacity = isOther ? 0.35 : (hasSevere ? 0.9 : 0.8);
+    const radius = isSelected ? 11 : (cluster.length > 1 ? 8 : 6);
+    const weight = isSelected ? 3 : 1.5;
+    const opacity = isOther ? 0.35 : 0.88;
 
     const marker = L.circleMarker([primaryInc.lat, primaryInc.lon], {
       radius,
-      color: isSelected ? "#ffffff" : baseColor,
+      color: isSelected ? "#ffffff" : "#0f172a",
       weight,
       fillColor: baseColor,
       fillOpacity: opacity,
