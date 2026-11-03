@@ -1,0 +1,175 @@
+\chapter{Circuit Schematic and Microcontroller Wiring Specification}
+\label{app:wiring}
+
+\section{Microcontroller Architecture and Power Rail Regulation}
+The physical telemetry sensing unit utilizes the Espressif ESP32-WROOM-32 microcontroller (DEVKIT V1 30-pin board). Because high-speed MicroSD SPI write transactions induce instantaneous transient current draws exceeding 100\,mA, powering the SD card directly from the ESP32 internal 3.3\,V LDO leads to supply voltage droop and flash filesystem corruption. To guarantee non-volatile logging integrity, an external AMS1117-3.3V low-dropout regulator is placed on the 5\,V primary rail to deliver a dedicated, decoupled 3.3\,V power domain.
+
+\begin{figure}[h!]
+	\centering
+	\begin{adjustbox}{width=0.95\textwidth}
+	\begin{tabular}{|l|l|l|l|p{4.5cm}|}
+		\hline
+		\textbf{ESP32 GPIO} & \textbf{Peripheral} & \textbf{Signal Type} & \textbf{Level} & \textbf{Circuit Function / Decoupling} \\
+		\hline
+		\hline
+		GPIO 21 (SDA) & SSD1306 / MPU-6050 & I2C Data & 3.3\,V & Hardware I2C bus with 4.7\,k$\Omega$ pullup resistors \\
+		GPIO 22 (SCL) & SSD1306 / MPU-6050 & I2C Clock & 3.3\,V & Synchronous clock operating at 400\,kHz Fast Mode \\
+		GPIO 16 (RX2) & u-blox NEO-6M & UART RX & 3.3\,V & NMEA sentence reception from GPS module (9600 baud) \\
+		GPIO 17 (TX2) & u-blox NEO-6M & UART TX & 3.3\,V & UBX configuration commands to GPS module \\
+		GPIO 5  (CS)  & MicroSD Breakout & SPI CS & 3.3\,V & Active-low slave select line \\
+		GPIO 18 (SCK) & MicroSD Breakout & SPI SCK & 3.3\,V & Serial SPI bus clock line \\
+		GPIO 19 (MISO)& MicroSD Breakout & SPI MISO & 3.3\,V & Master-in slave-out data return \\
+		GPIO 23 (MOSI)& MicroSD Breakout & SPI MOSI & 3.3\,V & Master-out slave-in data transmission \\
+		GPIO 25 (TRIG1)& Left JSN-SR04T & Pulse Out & 3.3\,V & $10\,\mu\text{s}$ trigger pulse generator for left acoustic beam \\
+		GPIO 26 (ECHO1)& Left JSN-SR04T & Pulse In & 3.3\,V & Left echo return via 1\,k$\Omega$ / 2\,k$\Omega$ resistive divider \\
+		GPIO 27 (TRIG2)& Right JSN-SR04T & Pulse Out & 3.3\,V & $10\,\mu\text{s}$ trigger pulse generator for right acoustic beam \\
+		GPIO 14 (ECHO2)& Right JSN-SR04T & Pulse In & 3.3\,V & Right echo return via 1\,k$\Omega$ / 2\,k$\Omega$ resistive divider \\
+		GPIO 4  (BTN)  & Handlebar Button & Input & 3.3\,V & Debounced momentary event push button (active low) \\
+		V50 / VIN      & TP4056 Output & Power In & 3.7--4.2\,V & Boosted battery input rail filtered by $10\,\mu\text{F}$ capacitor \\
+		3V3            & Sensor Modules & Power Out & 3.3\,V & Clean regulated logic rail decoupled by $100\,\text{nF}$ MLCC \\
+		GND            & All Subsystems & Ground & 0\,V & Low-impedance common ground plane return \\
+		\hline
+	\end{tabular}
+	\end{adjustbox}
+	\caption{Pinout assignment and electrical signal specification for CycleSafe telemetry node.}
+	\label{fig:pinout_table_app}
+\end{figure}
+
+\section{Ultrasonic Transducer Level Shifting}
+The JSN-SR04T waterproof ultrasonic modules operate from a 5.0\,V supply rail to maintain maximum acoustic output power. While their trigger inputs tolerate 3.3\,V logic pulses directly from the ESP32, their echo output pins assert 5.0\,V TTL pulses that would destroy the ESP32 input pins (which are non-5V-tolerant). 
+
+To ensure long-term reliability, a passive voltage divider is inserted between each sensor echo pin and the corresponding ESP32 GPIO input:
+\begin{equation}
+V_{\text{out}} = V_{\text{echo}} \left(\frac{R_2}{R_1 + R_2}\right) = 5.0\,\text{V} \left(\frac{2.0\,\text{k}\Omega}{1.0\,\text{k}\Omega + 2.0\,\text{k}\Omega}\right) = 3.33\,\text{V}
+\end{equation}
+This drops the logic high level to exactly 3.3\,V, safely within the ESP32 operating limits without introducing switching delay.
+
+\cleardoublepage
+\chapter{Hardware Bill of Materials and Dhanbad Sourcing Directory}
+\label{app:bom}
+
+\section{Procurement Directory and Verified Domestic Sourcing}
+All electronic modules, passive components, structural fasteners, and battery assemblies were identified from domestic Indian suppliers with verified fulfillment and active delivery to \textbf{IIT (ISM) Dhanbad, Jharkhand (Postal Code: 826004)}. Table \ref{tab:bom_verified} provides the complete itemized directory, model specifications, domestic suppliers, unit pricing, and product tracking references.
+
+\begin{table}[h!]
+	\centering
+	\caption{Complete verified Bill of Materials (BOM) with domestic Indian suppliers.}
+	\label{tab:bom_verified}
+	\setlength{\tabcolsep}{6pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{adjustbox}{width=\textwidth}
+	\begin{tabular}{|c|p{4.2cm}|p{3.8cm}|p{2.8cm}|r|p{3.2cm}|}
+		\hline
+		\textbf{No.} & \textbf{Component Description} & \textbf{Model Specification} & \textbf{Supplier} & \textbf{Cost (INR)} & \textbf{Sourcing Verification} \\
+		\hline
+		\hline
+		1 & ESP32 Microcontroller Node & DEVKIT V1 30-Pin CP2102 & Amazon India & 490 & Prime verified stock \\
+		2 & Waterproof Ultrasonic Sensors & JSN-SR04T V3.0 (Pair) & Quartz Components & 590 & Standard stock SKU \\
+		3 & Satellite Positioning Receiver & u-blox NEO-6MV2 Ceramic & TechDelivers & 246 & Verified distributor \\
+		4 & Graphic Display OLED & 0.96" SSD1306 I2C 128x64 & Amazon India & 289 & 2-day delivery \\
+		5 & 6-Axis Inertial Measurement Unit & InvenSense MPU-6050 & Amazon India & 179 & In-stock SKU \\
+		6 & MicroSD SPI Interface & Mini MicroSD 3.3V SPI & Quartz Components & 24 & Standard stock \\
+		7 & High-Speed Flash Memory Card & Geonix 32GB Class 10 & Amazon India & 479 & Retail boxed \\
+		8 & Li-ion Secondary Battery & 18650 2500mAh 3.7V & Quartz Components & 67 & Grade-A cell \\
+		9 & Enclosed Battery Holder & Single 18650 with Wire Leads & Amazon India & 45 & Standard leaded \\
+		10 & Li-ion Charge Management & TP4056 Type-C with Protect & Amazon India & 39 & Type-C upgraded \\
+		11 & Low-Dropout Voltage Regulator & AMS1117-3.3V Step-Down & Quartz Components & 18 & Decoupled PCB unit \\
+		12 & Handlebar Momentary Switch & 12mm Waterproof Panel Mount & Amazon India & 228 & IP67 metal push \\
+		13 & Custom Two-Layer Bare PCB & OpenBikeSensor v00.03 FR-4 & LionCircuits & 450 & Batch of 5 boards \\
+		14 & Custom Weatherproof Housing & FDM PETG 3D Printed Case & Think3D India & 350 & Custom slice quote \\
+		15 & Fasteners \& Wiring Harness & M3 Screws, JST-XH, Heatshrink & Department Lab & 0 & Institutional stock \\
+		\hline
+		\multicolumn{4}{|l|}{\textbf{Total System Procurement Cost (INR)}} & \textbf{3,494} & \textbf{All items verified} \\
+		\hline
+	\end{tabular}
+	\end{adjustbox}
+\end{table}
+
+\cleardoublepage
+\chapter{3D Printed Enclosure Specifications and Slicing Profiles}
+\label{app:enclosure}
+
+\section{Mechanical Design and Dimensional Tolerances}
+The physical enclosure architecture is adapted from the OpenBikeSensor (OBS) mechanical design repository, comprising two primary sub-assemblies:
+\begin{enumerate}
+    \item \textbf{Main Sensor Enclosure (Seatpost Unit):} Measures $128\,\text{mm} \times 64\,\text{mm} \times 48\,\text{mm}$. It houses the 2-layer PCB, ESP32, NEO-6M GPS antenna, 18650 cell, and dual lateral acoustic horns aligned at $90^\circ$ relative to the forward direction of travel. Transducer rubber sealing rings provide an IP65 splash-proof seal.
+    \item \textbf{Handlebar Display and Remote Unit:} Measures $54\,\text{mm} \times 42\,\text{mm} \times 28\,\text{mm}$. It clamps to 31.8\,mm or 25.4\,mm bicycle handlebars, housing the 0.96'' OLED display and the 12mm momentary event switch.
+\end{enumerate}
+
+\section{Additive Manufacturing Slicing Parameters}
+Both enclosures are sliced using PrusaSlicer / Cura for Fused Deposition Modeling (FDM) in \textbf{PETG (Polyethylene Terephthalate Glycol)} filament. Table \ref{tab:slicing_params} specifies the manufacturing parameters.
+
+\begin{table}[h!]
+	\centering
+	\caption{Additive manufacturing slicing parameters for CycleSafe PETG enclosures.}
+	\label{tab:slicing_params}
+	\setlength{\tabcolsep}{10pt}
+	\renewcommand{\arraystretch}{1.25}
+	\begin{tabular}{|l|l|p{6cm}|}
+		\hline
+		\textbf{Parameter} & \textbf{Selected Value} & \textbf{Engineering Justification} \\
+		\hline
+		\hline
+		Filament Material & PETG (Black) & UV resistance and $T_g \approx 85^\circ\text{C}$ thermal stability \\
+		Nozzle Diameter & 0.40\,mm & Balance of dimensional fidelity and print speed \\
+		Layer Height & 0.20\,mm & High inter-layer fusion and smooth surface finish \\
+		Wall Line Count & 4 Perimeters (1.6\,mm) & Prevents moisture ingress across layer boundaries \\
+		Top / Bottom Layers & 5 Solid Layers (1.0\,mm) & Structural rigidity against handlebar clamp torques \\
+		Infill Percentage & 30\% Density & Gyroid pattern for isotropic mechanical strength \\
+		Extruder Temperature & $240^\circ\text{C}$ & Optimal layer adhesion for PETG polymer \\
+		Heated Bed Temperature& $75^\circ\text{C}$ & Prevents corner warping on PEI spring steel bed \\
+		Cooling Fan Speed & 40\% (Off for first 3 layers) & High inter-layer bond strength \\
+		Print Speed & 50\,mm/s & High dimensional accuracy for sensor snap fits \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\cleardoublepage
+\chapter{Telemetry CSV Data Schema and REST API Reference}
+\label{app:api}
+
+\section{Telemetry Logging CSV Export Schema}
+The CycleSafe platform provides a one-click CSV export utility generating RFC 4180 compliant telemetry files. Each row corresponds to a single sampled epoch ($\Delta t = 0.5\,\text{s}$ in simulation; 10\,Hz in physical hardware). Table \ref{tab:csv_schema} documents the field definitions.
+
+\begin{table}[h!]
+	\centering
+	\caption{CycleSafe physical and synthetic telemetry export CSV schema.}
+	\label{tab:csv_schema}
+	\setlength{\tabcolsep}{8pt}
+	\renewcommand{\arraystretch}{1.25}
+	\begin{adjustbox}{width=\textwidth}
+	\begin{tabular}{|l|l|l|p{6.5cm}|}
+		\hline
+		\textbf{Column Header} & \textbf{Data Type} & \textbf{Units} & \textbf{Physical Interpretation / Description} \\
+		\hline
+		\hline
+		\texttt{timestamp\_ms} & Integer & Milliseconds & Unix epoch millisecond timestamp of the recorded epoch \\
+		\texttt{bicycle\_id} & String & Text & Unique identifier of the tracked bicycle (e.g., \texttt{bike\_0001}) \\
+		\texttt{latitude} & Float64 & Decimal Deg & WGS84 geographic latitude coordinate \\
+		\texttt{longitude} & Float64 & Decimal Deg & WGS84 geographic longitude coordinate \\
+		\texttt{speed\_mps} & Float32 & m/s & Ground travel speed computed from GPS / SUMO kinematic state \\
+		\texttt{accel\_x} & Float32 & $\text{m/s}^2$ & Longitudinal acceleration along bicycle travel axis \\
+		\texttt{accel\_y} & Float32 & $\text{m/s}^2$ & Lateral acceleration perpendicular to bicycle frame \\
+		\texttt{accel\_z} & Float32 & $\text{m/s}^2$ & Vertical gravitational and bump acceleration \\
+		\texttt{roll\_angle\_deg} & Float32 & Degrees & Dynamic tilt angle ($\phi$) estimated from accelerometer vector \\
+		\texttt{dist\_left\_m} & Float32 & Meters & Tilt-compensated clearance measured by left ultrasonic transducer \\
+		\texttt{dist\_right\_m} & Float32 & Meters & Tilt-compensated clearance measured by right ultrasonic transducer \\
+		\texttt{counterpart\_id} & String & Text & Vehicle ID of the closest passing vehicle (\texttt{"none"} if clear) \\
+		\texttt{counterpart\_type} & String & Text & Vehicle classification: \texttt{car}, \texttt{truck}, \texttt{moto}, \texttt{bike} \\
+		\texttt{conflict\_tier} & Integer & Enum (0--2) & ML severity: 0 = Safe Pass, 1 = Close Pass, 2 = Severe Incident \\
+		\texttt{user\_flag} & Boolean & True/False & Manual handlebar event button assertion flag \\
+		\hline
+	\end{tabular}
+	\end{adjustbox}
+\end{table}
+
+\section{Backend Microservice REST API Reference}
+The Go backend exposes RESTful HTTP endpoints for simulation orchestration and spatial querying:
+\begin{itemize}
+    \item \texttt{POST /api/simulation/run}: Asynchronously initiates a SUMO microscopic simulation with specified corridor length, vehicle fleet count, random seed, and duration. Returns an active \texttt{task\_id}.
+    \item \texttt{GET /api/simulation/status?id=\{task\_id\}}: Queries execution progress percentage, completed TraCI steps, and active memory allocation from Redis cache.
+    \item \texttt{GET /api/bicycles}: Enumerates all available bicycle entities within the database, returning summary encounter counts and total trajectory distances.
+    \item \texttt{GET /api/bicycles/\{id\}/trajectory}: Returns GeoJSON Linestring geometry and timestamped kinematic arrays for the specified bicycle.
+    \item \texttt{GET /api/bicycles/\{id\}/conflicts}: Returns filtered close-passing events and XGBoost severity tiers associated with the selected bicycle.
+    \item \texttt{GET /api/telemetry/export.csv?bicycle\_id=\{id\}}: Streams the complete trajectory and sensor log as a formatted CSV download.
+\end{itemize}

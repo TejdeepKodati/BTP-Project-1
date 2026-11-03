@@ -1,0 +1,62 @@
+\chapter{Introduction}
+\label{chap:intro}
+
+\section{Background and Context}
+Urban transportation systems worldwide are experiencing an imperative modal transition toward sustainable, non-motorized micro-mobility, centered predominantly on utility and commuter bicycling. Bicycling delivers well-documented societal dividends, including zero-emission urban transit, mitigation of localized traffic congestion, lower road infrastructure degradation, and substantial cardiovascular health improvements for citizens. Consequently, metropolitan transit authorities have prioritized cycling promotion through active mobility charters, expanded cycle path networks, and public bicycle sharing programs.
+
+However, the widespread adoption of utility cycling remains severely constrained by objective physical dangers and subjective risk perceptions. Cyclists operate as Vulnerable Road Users (VRUs), possessing minimal physical protection compared to occupants of passenger cars, trucks, and buses. In mixed-traffic corridors where dedicated, physically separated cycling infrastructure is absent, cyclists share the right-of-way directly with motorized vehicles characterized by significantly higher operating velocities, larger kinetic masses, and extensive blind spots. Under these conditions, motorized overtaking maneuvers represent one of the most hazardous interaction regimes in urban traffic dynamics.
+
+\section{Problem Statement}
+When a motorized vehicle overtakes a bicycle in a shared lane or an advisory cycle lane, insufficient lateral clearance---commonly designated as a ``close pass''---exposes the cyclist to extreme collision hazards, aerodynamic buffeting turbulence, startle-induced steering instabilities, and severe subjective trauma. Despite the severity of this hazard, traffic authorities and safety engineers face two critical methodological deficiencies:
+
+\begin{enumerate}
+    \item \textbf{Under-Reporting and Retrospective Lag of Incident Records:} Municipal road safety planning relies almost exclusively on retrospective police accident registries. However, near-miss close passes, aggressive overtakes without contact, and emergency avoidance swerves rarely appear in official statistics unless catastrophic injury or property damage occurs. As a result, hazardous road segments remain officially unflagged for years.
+    \item \textbf{Lack of Objective Telemetry and Context-Aware Conflict Classification:} Existing naturalistic cycling studies often rely on crude smartphone GPS loggers or manual rider questionnaires. Smartphone crowd-sensing frameworks (such as SimRA) record inertial shocks but lack lateral acoustic transducers to measure physical passing distances. Conversely, commercial radar sensors produce binary proximity flags without logging vehicle class distinctions (e.g., distinguishing between a 1.2\,m pass by a peer bicycle versus a 1.2\,m pass by a 15-ton multi-axle freight truck) or compensating for the bicycle's dynamic roll angle when leaning into turns.
+\end{enumerate}
+
+\section{Motivation and Significance}
+To curb overtaking hazards, modern traffic regulations have instituted strict statutory clearance mandates. Most prominently, the German Road Traffic Act (\textit{Stra{\ss}enverkehrs-Ordnung}, StVO) \S\,5 Abs.\,4 was amended in 2020 to mandate a minimum lateral passing clearance of \textbf{1.50 meters} within built-up urban boundaries and \textbf{2.00 meters} outside urban limits \cite{stvo2020germany}. Similar minimum passing distance laws (MPDL) have been enacted across multiple jurisdictions internationally \cite{beck2019passing}.
+
+Enforcing and evaluating these spatial regulations requires objective, empirical measurement infrastructure. An instrumented telemetry device capable of continuously logging centimeter-accurate lateral clearances, GPS coordinates, and three-axis inertial dynamics can map city-wide overtaking risk profiles. Furthermore, because physical sensor deployment across thousands of commuter bicycles is resource-intensive and logistically challenging, coupling physical IoT hardware telemetry with high-fidelity \textbf{microscopic traffic simulation} creates a powerful digital twin. Using calibrated microscopic simulators such as Eclipse SUMO \cite{lopez2018microscopic}, traffic researchers can model full-city traffic flows, test infrastructure redesigns, and predict cyclist conflict rates under varying traffic volumes before investing millions in civil road construction.
+
+\section{Aim and Objectives}
+\label{sec:aim_objectives}
+The overall \textbf{aim} of this project is to develop \textbf{CycleSafe}, an integrated open-architecture platform that combines instrumented bicycle hardware telemetry, microscopic multi-modal traffic simulation, and machine learning conflict classification to quantitatively analyze and mitigate urban cyclist overtaking risks.
+
+To achieve this primary aim, five concrete and measurable \textbf{objectives} are formulated:
+\begin{enumerate}
+    \item \textbf{Objective 1 (Embedded Hardware Architecture):} Design and engineer an open-hardware telemetry sensor node based on the ESP32 microcontroller, dual waterproof ultrasonic transducers (JSN-SR04T), satellite positioning (u-blox NEO-6M), and an MPU-6050 6-axis IMU, incorporating an analytical roll-angle tilt compensation model ($\phi = \arctan(a_y / \sqrt{a_x^2 + a_z^2})$) and a 3.3\,V power regulation rail to ensure non-volatile SD telemetry logging.
+    \item \textbf{Objective 2 (Mechanical Packaging \& Enclosure):} Synthesize and package the production-ready 3D printable mechanical housing in PETG material, providing weatherproof acoustic sensor brackets, handlebar display mounts, and universal seatpost clamping.
+    \item \textbf{Objective 3 (Microscopic Simulation Digital Twin):} Construct a calibrated, 10\,km multi-lane corridor simulation in Eclipse SUMO along Berlin's canonical thoroughfare (Ernst-Reuter-Platz to Oberbaumbr{\"u}cke), driven by empirical 12-hour vehicular census data (13,531 motor vehicles and 1,397 bicycles) normalized to a one-hour stochastic traffic population.
+    \item \textbf{Objective 4 (Machine Learning Conflict Classification):} Train and integrate an Extreme Gradient Boosting (XGBoost) classifier on the TU Berlin SimRA empirical dataset to evaluate overtaking encounters across three discrete severity tiers (\textit{Safe Pass}, \textit{Close Pass (Medium)}, and \textit{Severe Incident}), incorporating German StVO \S\,5(4) distance metrics and counterpart vehicle mass penalties.
+    \item \textbf{Objective 5 (Full-Stack Ingestion and Web Visualization):} Develop a responsive, containerized web platform (Go, PostgreSQL, Redis, Leaflet, Chart.js) featuring multi-bicycle trajectory inspection, spatial conflict heatmaps, kinematic acceleration graphs, and one-click telemetry CSV export.
+\end{enumerate}
+
+\section{Scope and Limitations}
+The scope of this project encompasses the end-to-end design, software implementation, circuit architecture, and simulation validation of the CycleSafe platform:
+\begin{itemize}
+    \item \textbf{Spatial Scope:} The microscopic simulation is calibrated on a 9.53\,km representative arterial corridor in Berlin connecting Charlottenburg (Point A: Ernst-Reuter-Platz) to Friedrichshain-Kreuzberg (Point B: Oberbaumbr{\"u}cke), representing mixed urban lanes, segregated cycle paths, and signalized junctions.
+    \item \textbf{Empirical Calibration Scope:} Traffic demand volumes and modal splits are derived directly from the official 2024/2025 Berlin Senate traffic census (\textit{Senatsverwaltung f{\"u}r Mobilit{\"a}t, Verkehr, Klimaschutz und Umwelt}) \cite{berlin2025report}.
+    \item \textbf{Hardware Prototyping Scope:} Full electrical schematics, pinout mapping, component procurement verification (Indian domestic suppliers delivering to Dhanbad PIN 826004), 3D STL enclosure packaging, and mathematical calibration are completed. Physical road testing is designed for subsequent campus deployment.
+    \item \textbf{Exclusions:} The simulation model utilizes a controlled multi-lane dual-corridor parameterized with the Intelligent Driver Model (IDM) and TraCI lateral sub-lane dynamics, rather than an uncalibrated 100,000-edge city-wide raw OSM mesh, ensuring 100\% deterministic collision tracking without junction deadlocks.
+\end{itemize}
+
+\section{Contributions}
+The primary contributions of this project are summarized as follows:
+\begin{enumerate}
+    \item \textbf{Inertial Tilt-Compensated Sensing Model:} Formulation and mathematical derivation of an MPU-6050 dynamic roll compensation equation that adjusts raw acoustic Time-of-Flight measurements ($d_{\text{true}} = d_{\text{measured}} \cos\phi$) to correct for cyclist cornering lean and pedaling sway.
+    \item \textbf{Microscopic TraCI Multi-Vehicle Traffic Engine:} An automated SUMO simulation pipeline generating stochastic multi-agent interactions across 1,244 concurrent vehicles with configurable random seeds and real-time kinematic telemetry extraction.
+    \item \textbf{Vehicle-Class Aware XGBoost Safety Engine:} A supervised classifier replacing arbitrary static distance thresholds with empirical near-miss criteria that account for speed differentials, deceleration rates, and vehicle mass disparities.
+    \item \textbf{Full-Stack Open Architecture:} An open-source, containerized web platform providing asynchronous simulation dispatching, multi-bicycle ride switching, and CSV telemetry exports.
+\end{enumerate}
+
+\section{Organization of the Report}
+The remainder of this report is organized as follows:
+\begin{itemize}
+    \item \textbf{Chapter \ref{chap:lit_review}: Literature Review and Related Work} provides a comprehensive survey of proximity sensing technologies, crowdsourced cycling safety initiatives (SimRA, OpenBikeSensor), and microscopic traffic simulation benchmarks.
+    \item \textbf{Chapter \ref{chap:requirements}: Requirements and Problem Formulation} outlines the application scenarios, functional and non-functional requirements, and the formal mathematical definitions of overtaking clearance.
+    \item \textbf{Chapter \ref{chap:methodology}: Proposed Methodology and System Design} details the platform architecture, acoustic physics, roll tilt math, XGBoost model formulation, and database schema.
+    \item \textbf{Chapter \ref{chap:implementation}: Implementation and Experimental Setup} documents the embedded hardware bill of materials, circuit pinouts, 3D printing parameters, and SUMO simulation parameters.
+    \item \textbf{Chapter \ref{chap:results}: Results and Discussion} presents the experimental validation, quantitative conflict distributions across vehicle modes, ML classification accuracy, and sensitivity analyses.
+    \item \textbf{Chapter \ref{chap:conclusion}: Conclusion and Future Work} synthesizes the principal findings, evaluates objective fulfillment, and outlines a technical roadmap for field deployment.
+\end{itemize}

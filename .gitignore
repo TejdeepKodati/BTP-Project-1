@@ -81,3 +81,16 @@ references/
 
 start_cyclesafe.bat
 stop_cyclesafe.bat
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.lot
+*.lof
+*.toc
+*.out
+*.synctex.gz
+*.xdv
+*.fls
+*.fdb_latexmk

@@ -1,0 +1,97 @@
+\chapter{Requirements and Problem Formulation}
+\label{chap:requirements}
+
+\section{Application Scenario}
+The operational environment for CycleSafe comprises dense metropolitan road networks characterized by mixed traffic flows, variable infrastructure typologies, and high vehicle density. The primary application workflow proceeds across two interconnected operational domains:
+
+\begin{enumerate}
+    \item \textbf{Physical Sensing Scenario:} An urban utility or commuter cyclist mounts the CycleSafe telemetry unit on their bicycle (main sensor pod on the seatpost beneath the saddle, and remote display/trigger pod on the handlebar). As the cyclist traverses their daily commute, the device continuously emits ultrasonic ranging pulses to monitor lateral clearance to passing traffic and roadside obstacles at 20\,Hz, samples geographic coordinates at 1\,Hz via GPS, and monitors 6-axis inertial motion at 100\,Hz. When an overtaking vehicle performs a dangerous maneuver, the cyclist presses the handlebar button. All telemetry is stored on an onboard FAT32 MicroSD card.
+    \item \textbf{Microscopic Simulation Scenario:} Urban transport planners, municipal engineers, and researchers access the CycleSafe web platform. Rather than waiting months to collect empirical rides across every city block, the user selects an urban corridor (e.g., Berlin's 10\,km Ernst-Reuter-Platz to Oberbaumbr{\"u}cke corridor) and specifies a traffic demand window (e.g., peak morning rush hour 07:00--08:00). The simulation engine spins up a microscopic multi-agent digital twin simulating 1,244 moving vehicles, executes the XGBoost ML conflict evaluator, and generates telemetry streams identical in structure to the physical hardware node.
+\end{enumerate}
+
+\section{Functional Requirements}
+The functional capabilities of the CycleSafe platform are codified into eight formal requirements:
+
+\begin{itemize}
+    \item \textbf{FR-1: Dual-Sided Acoustic Ranging:} The embedded system shall measure lateral distances independently on both left and right flanks over a measurement span of 0.20\,m to 4.50\,m with a millimeter-level resolving capability.
+    \item \textbf{FR-2: Dynamic Roll-Angle Tilt Compensation:} The system shall continuously measure tri-axial acceleration, compute the instantaneous frame roll angle $\phi$, and apply trigonometric correction to raw acoustic distances in real time.
+    \item \textbf{FR-3: Geospatial Georeferencing:} The device shall acquire and log WGS84 latitude and longitude coordinates with active HDOP monitoring and NMEA-0183 checksum validation.
+    \item \textbf{FR-4: User Event Triggering:} The handlebar unit shall register manual rider confirmations via an interrupt-driven momentary switch, recording a timestamped event flag correlated with ultrasonic and IMU vectors.
+    \item \textbf{FR-5: Fail-Safe Local Persistence:} Sensor readings shall be serialized and flushed to non-volatile MicroSD storage in CSV format, protected against brownout file system corruption.
+    \item \textbf{FR-6: Microscopic Multi-Modal Traffic Simulation:} The simulation subsystem shall execute 60-minute multi-vehicle traffic runs in Eclipse SUMO utilizing the sublane model (lateral resolution $\le 0.2\,\text{m}$) and the Intelligent Driver Model (IDM).
+    \item \textbf{FR-7: Multi-Class Machine Learning Conflict Classification:} The platform shall classify every vehicular interaction into one of three discrete categories (\textit{Safe Pass}, \textit{Close Pass (Medium)}, or \textit{Severe Incident}) using an empirical XGBoost model that accounts for clearance distance, relative speed, acceleration, and counterpart vehicle category.
+    \item \textbf{FR-8: Interactive Spatial Visualization and Telemetry Export:} The web interface shall visualize simulated and physical rides on interactive Leaflet maps, render kinematic time-series charts, and allow one-click export of complete trajectory points to CSV.
+\end{itemize}
+
+\section{Non-Functional Requirements}
+To ensure practical field utility and academic reliability, the platform satisfies the following non-functional criteria:
+
+\begin{itemize}
+    \item \textbf{NFR-1 (Ranging Accuracy):} Lateral distance measurements shall maintain a maximum absolute error of $\le \pm 2\,\text{cm}$ within the critical 0.5\,m to 2.5\,m overtaking zone under ambient operating temperatures ($0^\circ\text{C}$ to $45^\circ\text{C}$).
+    \item \textbf{NFR-2 (Latency and Real-Time Responsiveness):} The embedded firmware loop shall execute ultrasonic trigger-echo sampling, IMU polling, and OLED display refresh within a strict latency bound of $< 50\,\text{ms}$ per cycle.
+    \item \textbf{NFR-3 (Operational Battery Autonomy):} The embedded hardware shall operate continuously for a minimum of 6.0 hours on a single 18650 2500\,mAh lithium-ion cell under full sensor polling and active logging.
+    \item \textbf{NFR-4 (Weather and Mechanical Durability):} The physical enclosure shall exhibit IP65 splash resistance, utilizing PETG 3D-printed housing capable of withstanding solar thermal exposure up to $80^\circ\text{C}$ without geometric softening.
+    \item \textbf{NFR-5 (Simulation Determinism and Reproducibility):} The microscopic simulation engine shall accept arbitrary pseudo-random seeds to enable either perfectly deterministic regression testing or stochastic variance across simulation runs.
+    \item \textbf{NFR-6 (Low Component Cost):} The complete bill of materials for the physical telemetry node shall not exceed INR~4,000 (~45 USD), sourced entirely through domestic Indian electronics vendors with active shipping to IIT (ISM) Dhanbad (PIN: 826004).
+\end{itemize}
+
+\section{Constraints and Assumptions}
+\subsection{Hardware and Operational Constraints}
+\begin{enumerate}
+    \item \textbf{Ultrasonic Acoustic Blind Zone:} The JSN-SR04T transducer exhibits a physical acoustic ring-down blind zone of 20\,cm. Objects closer than 0.20\,m from the transducer faceplate cannot be resolved acoustically.
+    \item \textbf{I2C Bus Address Constraints:} The Solomon Systech SSD1306 OLED controller is hardwired to 7-bit slave address \texttt{0x3C}, while the InvenSense MPU-6050 is configured to address \texttt{0x68} by pulling pin \texttt{AD0} to ground.
+    \item \textbf{Single-Cell Lithium Voltage Characteristics:} A standard 18650 NMC battery operates across a dynamic voltage curve from 4.2\,V (full charge) down to 3.0\,V (cutoff). Because the ESP32 and MicroSD card require a stable 3.3\,V rail, a low-dropout regulator with dropout voltage $V_{\text{drop}} < 200\,\text{mV}$ at typical operating currents is mandatory.
+\end{enumerate}
+
+\subsection{Simulation Modeling Assumptions}
+\begin{enumerate}
+    \item \textbf{Corridor Boundary Conditions:} In the 10\,km simulation corridor, all generated vehicles depart at the western boundary (Ernst-Reuter-Platz) and exit at the eastern boundary (Oberbaumbr{\"u}cke), representing continuous arterial traffic.
+    \item \textbf{Vehicle Modal Homogeneity:} Within each vehicle class (passenger cars, trucks, motorcycles, bicycles), physical dimensions and maximum braking decelerations follow standard German federal fleet parameters defined in the SUMO vehicle type definitions.
+\end{enumerate}
+
+\section{Formal Problem Definition}
+Let the state of the instrumented ego bicycle at discrete simulation timestamp $t$ be defined by the tuple:
+\begin{equation}
+    S_{\text{ego}}(t) = \left( \mathbf{p}_{\text{ego}}(t), v_{\text{ego}}(t), a_{\text{ego}}(t), \phi(t) \right)
+\end{equation}
+where $\mathbf{p}_{\text{ego}}(t) = (\lambda_{\text{ego}}(t), \mu_{\text{ego}}(t))$ denotes the WGS84 geographic coordinate (longitude, latitude), $v_{\text{ego}}(t)$ is the scalar longitudinal velocity, $a_{\text{ego}}(t)$ is the acceleration vector, and $\phi(t)$ is the frame roll tilt angle.
+
+Similarly, let a motorized counterpart vehicle $k \in \{1, 2, \dots, K\}$ operating in spatial proximity be represented by:
+\begin{equation}
+    S_{k}(t) = \left( \mathbf{p}_{k}(t), v_{k}(t), a_{k}(t), C_{k}, L_{k}, W_{k} \right)
+\end{equation}
+where $C_{k} \in \{\text{car}, \text{truck}, \text{motorbike}, \text{bike}\}$ denotes the counterpart vehicle class, and $L_{k}, W_{k}$ represent bounding length and width dimensions.
+
+\subsection{Edge-to-Edge Spatial Clearance}
+The true physical clearance $d_{\text{clear}}(t, k)$ between the lateral bounding edge of the bicycle and the nearest lateral surface of the counterpart vehicle is formulated as:
+\begin{equation}
+    d_{\text{clear}}(t, k) = \max \left( 0,\, \|\mathbf{p}_{k}(t) - \mathbf{p}_{\text{ego}}(t)\| - \frac{W_{\text{ego}} + W_{k}}{2} \right)
+\end{equation}
+In the physical hardware telemetry unit, this clearance is measured by the lateral ultrasonic transducer and corrected for roll angle:
+\begin{equation}
+    d_{\text{true}}(t) = d_{\text{measured}}(t) \cdot \cos\left( \phi(t) \right)
+\end{equation}
+
+\subsection{Kinematic Conflict Metrics}
+To assess encounter criticality, two classical microscopic conflict metrics are formulated:
+\begin{enumerate}
+    \item \textbf{Time-to-Collision (TTC):} When the counterpart vehicle approaches the bicycle from behind in the same or adjacent lane with relative closing velocity $\Delta v(t) = v_{k}(t) - v_{\text{ego}}(t) > 0$:
+    \begin{equation}
+        \text{TTC}(t, k) = \frac{\Delta x_{\text{long}}(t, k)}{\Delta v(t)} = \frac{x_{k}(t) - x_{\text{ego}}(t)}{v_{\text{ego}}(t) - v_{k}(t)}
+    \end{equation}
+    \item \textbf{Post-Encroachment Time (PET):} The temporal interval between the departure of the bicycle from a shared lane conflict zone and the arrival of the overtaking vehicle at the exact same spatial coordinates:
+    \begin{equation}
+        \text{PET} = t_{\text{arrival}}(k, \mathbf{p}^*) - t_{\text{departure}}(\text{ego}, \mathbf{p}^*)
+    \end{equation}
+\end{enumerate}
+
+\subsection{Multi-Class Hazard Optimization}
+The classification objective is to map the multidimensional encounter observation vector $\mathbf{x} = [d_{\text{clear}},\, \Delta v,\, a_{\text{ego}},\, a_{k},\, C_{k}]$ into a discrete severity label $y \in \{0, 1, 2\}$:
+\begin{equation}
+    y = \begin{cases}
+        0 & \text{(Safe Pass: StVO compliance, } d_{\text{clear}} \ge 1.5\,\text{m}) \\
+        1 & \text{(Close Pass Medium: } 1.0\,\text{m} \le d_{\text{clear}} < 1.5\,\text{m} \text{ or mild deceleration}) \\
+        2 & \text{(Severe Incident: } d_{\text{clear}} < 1.0\,\text{m} \text{ or emergency braking } a_{\text{ego}} \le -2.5\,\text{m/s}^2)
+    \end{cases}
+\end{equation}
+This formulation underpins the machine learning classification engine detailed in the following chapter.

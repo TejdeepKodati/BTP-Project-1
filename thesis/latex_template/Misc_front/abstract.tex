@@ -1,0 +1,16 @@
+\addcontentsline{toc}{section}{Abstract}
+\begin{center}
+	\fontsize{16pt}{22pt}\selectfont \textbf{\MakeUppercase{Abstract}}
+\end{center}
+\vspace{0.5cm}
+
+\noindent Vulnerable road users, particularly urban cyclists, face disproportionate traffic safety risks from unsafe motor vehicle overtaking maneuvers and aggressive close-passing interactions. Existing safety evaluations predominantly depend either on retrospective police crash records---which suffer from severe under-reporting of near-misses---or on crowd-sourced binary incident markers that lack objective physical distance measurements and vehicle-specific conflict severity weighting.
+
+\noindent This project presents \textbf{CycleSafe}, an integrated hardware telemetry and microscopic traffic simulation framework for multi-modal urban cyclist safety analysis. The physical telemetry subsystem builds upon the OpenBikeSensor (OBS) architecture, employing an ESP32 microcontroller, dual waterproof ultrasonic distance transducers, u-blox NEO-6M satellite positioning, and an MPU-6050 six-axis inertial measurement unit. We formulate an analytical roll-angle tilt compensation model ($\phi = \arctan(a_y / \sqrt{a_x^2 + a_z^2})$) that eliminates cornering-induced distance measurement distortions, accompanied by a dedicated 3.3\,V power regulation rail that prevents SD card data corruption. 
+
+\noindent In the simulation domain, we develop an empirical microscopic digital twin using Eclipse SUMO and TraCI over a 9.53\,km urban corridor in Berlin (Ernst-Reuter-Platz to Oberbaumbr{\"u}cke). The traffic population is calibrated against empirical 12-hour census data (13,531 motor vehicles and 1,397 bicycles), modeling mixed-lane interactions across passenger cars, heavy-duty trucks, motorcycles, and peer cyclists. We train an extreme gradient boosting (XGBoost) classifier on the TU Berlin SimRA dataset to evaluate conflict encounters across three distinct severity classes (\textit{Safe Pass}, \textit{Close Pass (Medium)}, and \textit{Severe Incident}), incorporating German StVO \S\,5(4) 1.5\,m statutory clearance thresholds and counterpart vehicle mass penalties. 
+
+\noindent The platform features a full-stack dashboard built with Go, PostgreSQL, Redis, Leaflet, and Chart.js, providing interactive spatial clustering, multi-bicycle telemetry tracking, and one-click CSV export. CycleSafe provides municipal traffic planners and researchers with an objective, reproducible pipeline bridging physical IoT sensing with synthetic urban scale simulation.
+
+\vspace{0.8cm}
+\noindent \textbf{Keywords:} Vulnerable Road Users (VRUs), Bicycle Safety, Microscopic Traffic Simulation, SUMO, OpenBikeSensor, Close-Pass Detection, XGBoost, Inertial Roll Compensation.

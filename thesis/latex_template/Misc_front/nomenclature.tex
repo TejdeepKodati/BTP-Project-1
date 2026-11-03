@@ -1,0 +1,65 @@
+\begin{center}
+	\fontsize{16pt}{22pt}\selectfont \textbf{\MakeUppercase{Abbreviations and Symbols}}
+\end{center}
+\vspace{0.5cm}
+
+\section*{List of Abbreviations}
+\begin{table}[h!]
+	\centering
+	\setlength{\tabcolsep}{12pt}
+	\renewcommand{\arraystretch}{1.3}
+	\begin{tabular}{p{3.5cm}p{11cm}}
+		\hline
+		\textbf{Abbreviation} & \textbf{Full Form / Definition} \\
+		\hline
+		\textbf{BTP} & Bachelor of Technology Project \\
+		\textbf{CSE} & Computer Science and Engineering \\
+		\textbf{ESP32} & Espressif Systems 32-bit Dual-Core Microcontroller \\
+		\textbf{FDM} & Fused Deposition Modeling (3D Printing) \\
+		\textbf{GPIO} & General Purpose Input/Output \\
+		\textbf{GPS} & Global Positioning System \\
+		\textbf{I2C} & Inter-Integrated Circuit Serial Bus \\
+		\textbf{IDM} & Intelligent Driver Model (Car-Following Physics) \\
+		\textbf{IMU} & Inertial Measurement Unit (MPU-6050) \\
+		\textbf{IoT} & Internet of Things \\
+		\textbf{NMEA} & National Marine Electronics Association 0183 Protocol \\
+		\textbf{OLED} & Organic Light Emitting Diode \\
+		\textbf{OBS} & OpenBikeSensor Open Hardware Standard \\
+		\textbf{OSM} & OpenStreetMap Geographic Database \\
+		\textbf{PET} & Post-Encroachment Time \\
+		\textbf{PETG} & Polyethylene Terephthalate Glycol Filament \\
+		\textbf{PLA} & Polylactic Acid Filament \\
+		\textbf{SPI} & Serial Peripheral Interface \\
+		\textbf{StVO} & Stra{\ss}enverkehrs-Ordnung (German Road Traffic Act) \\
+		\textbf{SUMO} & Simulation of Urban MObility \\
+		\textbf{ToF} & Time-of-Flight (Acoustic Distance Measurement) \\
+		\textbf{TraCI} & Traffic Control Interface (SUMO Python API) \\
+		\textbf{TTC} & Time-to-Collision \\
+		\textbf{VRU} & Vulnerable Road User \\
+		\textbf{XGBoost} & Extreme Gradient Boosting Machine Learning \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\section*{List of Mathematical Symbols}
+\begin{table}[h!]
+	\centering
+	\setlength{\tabcolsep}{12pt}
+	\renewcommand{\arraystretch}{1.3}
+	\begin{tabular}{p{3.5cm}p{11cm}}
+		\hline
+		\textbf{Symbol} & \textbf{Meaning / Definition [Units]} \\
+		\hline
+		$d_{\text{measured}}$ & Raw acoustic distance recorded by ultrasonic transducer [m] \\
+		$d_{\text{true}}$ & Perpendicular ground clearance corrected for frame roll tilt [m] \\
+		$\phi$ & Instantaneous bicycle frame roll / tilt angle [rad or deg] \\
+		$a_x, a_y, a_z$ & Tri-axial accelerometer readings from MPU-6050 [$\text{m/s}^2$] \\
+		$v_{\text{ego}}$ & Longitudinal speed of the ego bicycle [$\text{m/s}$ or $\text{km/h}$] \\
+		$v_{\text{other}}$ & Instantaneous speed of overtaking motor vehicle [$\text{m/s}$ or $\text{km/h}$] \\
+		$\Delta t$ & Ultrasonic echo pulse duration round-trip time [$\mu\text{s}$] \\
+		$c(T)$ & Speed of sound in ambient air at temperature $T$ [$\text{m/s}$] \\
+		$s_0$ & Minimum jam distance in Intelligent Driver Model [m] \\
+		$T$ & Desired safe headway time gap in IDM [s] \\
+		\hline
+	\end{tabular}
+\end{table}

@@ -1,0 +1,151 @@
+\chapter{Proposed Methodology and System Design}
+\label{chap:methodology}
+
+\section{Overall Architecture}
+The CycleSafe platform is structured as a dual-layer cyber-physical architecture comprising two complementary operational subsystems:
+\begin{enumerate}
+    \item \textbf{Embedded Physical Telemetry Node (Edge Layer):} An instrumented on-bicycle IoT sensing node that captures real-world lateral ultrasonic clearances, geographic coordinates, 6-axis inertial dynamics, and manual cyclist event confirmations.
+    \item \textbf{Microscopic Simulation \& ML Analytics Engine (Cloud/Server Layer):} A containerized backend service running Eclipse SUMO, TraCI, PostgreSQL, Redis, and a supervised XGBoost classification model, exposed via a full-stack web application.
+\end{enumerate}
+
+Figure \ref{fig:arch_diagram} visualizes the cross-layer system dataflow and component interconnections.
+
+\begin{figure}[h!]
+	\centering
+	\begin{adjustbox}{width=0.95\textwidth}
+	\begin{tabular}{|c|c|c|}
+		\hline
+		\multicolumn{3}{|c|}{\textbf{LAYER 1: EMBEDDED PHYSICAL TELEMETRY NODE (Edge Hardware)}} \\
+		\hline
+		\textbf{Ranging \& Kinematics} & \textbf{Microcontroller \& Processing} & \textbf{Power \& User Interface} \\
+		Dual JSN-SR04T Ultrasonic (20\,Hz) & ESP32 Dual-Core Xtensa LX6 (240\,MHz) & 18650 Li-ion 2500\,mAh (3.7\,V) \\
+		MPU-6050 6-Axis IMU (I2C: 0x68) & FreeRTOS Dual-Task Architecture & TP4056 Type-C Charger + Protection \\
+		u-blox NEO-6M GPS (UART2 @ 9600) & FAT32 MicroSD SPI Data Logger & AMS1117-3.3V Low-Dropout Regulator \\
+		Handlebar Event Button (12\,mm) & I2C Shared Bus (GPIO 21/22) & 0.96" SSD1306 OLED (I2C: 0x3C) \\
+		\hline
+		\multicolumn{3}{|c|}{$\Downarrow$ \textit{Standardized Telemetry CSV Schema} $\{t,\, \text{lat},\, \text{lon},\, d_L,\, d_R,\, a_x,\, a_y,\, a_z,\, \text{btn}\} \Downarrow$} \\
+		\hline
+		\multicolumn{3}{|c|}{\textbf{LAYER 2: MICROSCOPIC SIMULATION \& MACHINE LEARNING PLATFORM (Server)}} \\
+		\hline
+		\textbf{Simulation Subsystem} & \textbf{Machine Learning Engine} & \textbf{Web Application \& Storage} \\
+		Eclipse SUMO 1.27.1 + TraCI & XGBoost 3-Class Gradient Booster & Go 1.23 REST API Service \\
+		10\,km Berlin Arterial Corridor & Trained on TU Berlin SimRA Data & PostgreSQL 16 (Timescale Schema) \\
+		1,244 Stochastic Vehicles (12h Census) & StVO \S\,5(4) Distance Rule Encoders & Redis 7 (In-Memory Job Cache) \\
+		Sublane Lateral Dynamics (0.2\,m) & Modal Severity Weighting Matrix & Leaflet Map + Chart.js Dashboard \\
+		\hline
+	\end{tabular}
+	\end{adjustbox}
+	\caption{End-to-end architectural dataflow of the CycleSafe platform.}
+	\label{fig:arch_diagram}
+\end{figure}
+
+\section{Design Rationale}
+The selection of hardware components and software libraries is guided by strict engineering tradeoffs between measurement accuracy, power consumption, cost, and open-source accessibility:
+
+\begin{itemize}
+    \item \textbf{Espressif ESP32 Microcontroller:} Chosen for its dual-core 32-bit architecture operating at 240\,MHz with 520\,KB SRAM. Core 0 is dedicated to high-frequency FreeRTOS sensor sampling (ultrasonic pulse capture and IMU polling), while Core 1 handles NMEA sentence parsing, OLED display rendering, and SPI MicroSD block writes without timing jitter.
+    \item \textbf{JSN-SR04T Waterproof Transducers:} Unlike exposed open-mesh ultrasonic sensors (such as HC-SR04), the JSN-SR04T features an enclosed, sealed aluminum transducer probe connected via a 2.5\,m coaxial cable. This design provides IP67 environmental protection against rain, road splashes, and dust, essential for outdoor cycling.
+    \item \textbf{Shared I2C Bus Multiplexing:} Both the 0.96" SSD1306 OLED display and the MPU-6050 IMU communicate over the identical physical two-wire interface (\texttt{GPIO 21 = SDA}, \texttt{GPIO 22 = SCL}). Because the OLED controller resides at 7-bit address \texttt{0x3C} and the MPU-6050 resides at \texttt{0x68}, the bus supports concurrent operation with zero additional GPIO pin overhead.
+    \item \textbf{Dedicated AMS1117-3.3V Power Regulation Rail:} During write operations, MicroSD cards draw transient current spikes exceeding 100\,mA, while the ESP32 RF subsystem draws up to 240\,mA during Wi-Fi beacon transmission. Supplying these peripherals from a dedicated low-dropout regulator isolated from the raw battery prevents voltage sagging below the 2.7\,V brownout threshold.
+\end{itemize}
+
+\section{Algorithms and Mathematical Models}
+
+\subsection{Acoustic Time-of-Flight Ranging Physics}
+The physical distance $d_{\text{measured}}$ from the ultrasonic transducer faceplate to the nearest reflecting vehicle surface is governed by the two-way acoustic Time-of-Flight equation:
+\begin{equation}
+    d_{\text{measured}} = \frac{c(T) \cdot \Delta t}{2}
+\end{equation}
+where $\Delta t$ is the measured echo pulse duration (round-trip transit time in microseconds), and $c(T)$ is the acoustic propagation velocity in air. The speed of sound is sensitive to ambient air temperature $T$ ($^\circ\text{C}$):
+\begin{equation}
+    c(T) = 331.3 \cdot \sqrt{1 + \frac{T}{273.15}} \approx 331.3 + 0.606 \cdot T \quad [\text{m/s}]
+\end{equation}
+At standard ambient temperature ($20^\circ\text{C}$), $c(20) = 343.4\,\text{m/s}$, yielding a spatial resolution of $0.1717\,\text{mm}$ per microsecond of echo pulse duration.
+
+\subsection{Analytical Dynamic Roll-Angle Tilt Compensation}
+\label{sec:tilt_comp}
+During cornering and pedaling, the bicycle frame tilts at an instantaneous roll angle $\phi$ relative to the true gravitational vertical. An uncompensated transducer rigidly mounted to the frame projects an inclined acoustic beam, measuring an oblique hypotenuse distance $d_{\text{measured}}$ rather than the true horizontal ground clearance $d_{\text{true}}$ (Figure \ref{fig:tilt_geometry}).
+
+\begin{figure}[h!]
+	\centering
+	\begin{adjustbox}{width=0.85\textwidth}
+	\begin{tabular}{|c|}
+		\hline
+		\textbf{GEOMETRIC TILT COMPENSATION MODEL} \\
+		\hline
+		\\[-0.5em]
+		$\begin{aligned}
+			\text{Gravitational Vector: } &\quad \mathbf{g} = [0, 0, -9.81]^T \\
+			\text{Measured Acceleration: } &\quad \mathbf{a} = [a_x, a_y, a_z]^T \quad (\text{from MPU-6050}) \\
+			\text{Roll Angle Formulation: } &\quad \phi = \arctan\left(\frac{a_y}{\sqrt{a_x^2 + a_z^2}}\right) \\
+			\text{Corrected Horizontal Clearance: } &\quad d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
+		\end{aligned}$ \\
+		\\[-0.5em]
+		\hline
+	\end{tabular}
+	\end{adjustbox}
+	\caption{Formulation of dynamic roll-angle tilt compensation.}
+	\label{fig:tilt_geometry}
+\end{figure}
+
+The MPU-6050 IMU samples three-axis acceleration vectors $(a_x, a_y, a_z)$ at 100\,Hz. The instantaneous roll angle $\phi$ is calculated analytically using:
+\begin{equation}
+    \phi = \arctan\left( \frac{a_y}{\sqrt{a_x^2 + a_z^2}} \right)
+\end{equation}
+The true perpendicular ground clearance to the overtaking vehicle is then computed by projecting the measured hypotenuse onto the horizontal plane:
+\begin{equation}
+    d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
+\end{equation}
+For example, if a cyclist leans into a corner at $\phi = 20^\circ$ and the sensor records $d_{\text{measured}} = 1.60\,\text{m}$, the uncompensated reading would classify the overtake as safe ($> 1.5\,\text{m}$), whereas the true horizontal distance is $d_{\text{true}} = 1.60 \cdot \cos(20^\circ) = 1.503\,\text{m}$, near the critical threshold.
+
+\subsection{XGBoost Supervised Conflict Classification Engine}
+\label{sec:xgboost_formulation}
+Rather than applying a rigid, one-size-fits-all threshold of 1.5\,m regardless of context, CycleSafe employs an Extreme Gradient Boosting (\textbf{XGBoost}) \cite{chen2016xgboost} multi-class classifier. The feature vector $\mathbf{x}_i \in \mathbb{R}^6$ extracted for each vehicular encounter comprises:
+\begin{equation}
+    \mathbf{x}_i = \left[ d_{\text{min}},\, v_{\text{ego}},\, v_{\text{other}},\, a_{\text{ego,min}},\, \Delta v,\, C_{\text{type}} \right]
+\end{equation}
+where:
+\begin{itemize}
+    \item $d_{\text{min}}$ is the minimum roll-compensated clearance observed during the encounter [m],
+    \item $v_{\text{ego}}, v_{\text{other}}$ are the instantaneous velocities of bicycle and vehicle [m/s],
+    \item $a_{\text{ego,min}}$ is the peak longitudinal deceleration recorded by the cyclist [$\text{m/s}^2$],
+    \item $\Delta v = v_{\text{other}} - v_{\text{ego}}$ is the relative overtaking velocity [m/s],
+    \item $C_{\text{type}} \in \{0: \text{bike}, 1: \text{car}, 2: \text{truck/bus}, 3: \text{motorbike}\}$ is the integer-encoded vehicle class.
+\end{itemize}
+
+The XGBoost model minimizes a regularized objective function across $K$ additive decision trees:
+\begin{equation}
+    \mathcal{L}(\Theta) = \sum_{i=1}^{N} l\left( y_i, \hat{y}_i \right) + \sum_{k=1}^{K} \Omega(f_k)
+\end{equation}
+where the loss function $l$ is multi-class cross-entropy, and the tree complexity regularization term $\Omega(f_k)$ penalizes leaf count $T$ and weight vector $\mathbf{w}$:
+\begin{equation}
+    \Omega(f_k) = \gamma T + \frac{1}{2}\lambda \sum_{j=1}^{T} w_j^2
+\end{equation}
+The optimal split at each node is determined by maximizing the split gain criterion:
+\begin{equation}
+    \text{Gain} = \frac{1}{2} \left[ \frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda} \right] - \gamma
+\end{equation}
+where $G$ and $H$ represent first and second-order gradient statistics of the loss function.
+
+\subsection{Encoding German StVO Statutory Clearances and Modal Penalties}
+The classifier integrates the legal requirements of German StVO \S\,5(4) \cite{stvo2020germany} by enforcing asymmetric loss penalties. Passing clearances below 1.5\,m are inherently penalized. Furthermore, counterpart vehicle mass penalties are applied: an overtaking truck or municipal bus ($C_{\text{type}} = 2$) displacing significant aerodynamic volume and possessing blind zones requires a widened safety buffer ($d_{\text{safe}} \ge 2.0\,\text{m}$), whereas peer bicycles passing on segregated paths ($C_{\text{type}} = 0$) are considered non-conflicting down to clearances of 0.80\,m.
+
+\section{Data and Empirical Sources}
+The models and simulations in CycleSafe are calibrated using two empirical open-access transportation datasets:
+\begin{enumerate}
+    \item \textbf{TU Berlin SimRA Open Dataset:} Comprises over 25,000 real-world bicycle rides collected across Berlin \cite{simra2020crowdsourcing}. Ground-truth near-miss annotations and accelerometer traces were extracted to train and validate the XGBoost classifier.
+    \item \textbf{Berlin Senate Traffic Census 2024/2025 (Oberbaumbr{\"u}cke Counting Station):} Official 12-hour automated traffic counts (07:00--19:00) provided by the \textit{Senatsverwaltung f{\"u}r Mobilit{\"a}t, Verkehr, Klimaschutz und Umwelt} (Document S19-23905 and \textit{Bericht Radverkehr 2025}) \cite{berlin2025report}. The dataset records:
+    \begin{itemize}
+        \item Passenger Cars and Light Commercial Vehicles (Pkw + Lfw): 12,260 (90.6\% of motor vehicles)
+        \item Heavy-Duty Trucks and Buses (Lkw + Bus): 676 (5.0\%)
+        \item Motorbikes and Scooters (Krad): 595 (4.4\%)
+        \item Commuter Bicycles: 1,397
+    \end{itemize}
+\end{enumerate}
+
+\section{Ethics, Privacy, and Data Governance}
+Because cycling telemetry captures fine-grained spatiotemporal trajectories that could reveal residential addresses or personal daily routines, CycleSafe incorporates privacy-by-design principles compliant with European Union General Data Protection Regulation (GDPR) standards:
+\begin{itemize}
+    \item \textbf{No Optical Surveillance:} The telemetry unit relies entirely on ultrasonic time-of-flight acoustic pulses and inertial sensors; no video cameras or facial recognition systems are deployed.
+    \item \textbf{Spatial Obfuscation at Trip Terminals:} In production ingestion, the initial and concluding 200 meters of recorded GPS tracks are clipped to prevent home or workplace deanonymization.
+\end{itemize}
