@@ -13,17 +13,17 @@ The integrated CycleSafe platform was validated through end-to-end simulation ru
 \end{enumerate}
 
 \section{Quantitative Simulation Results and Conflict Distribution}
-Under baseline experimental parameters (Seed: \texttt{12345}, Duration: 3,600\,s, Total Fleet: 1,244 vehicles), a total of \textbf{1,048 close proximity encounters} were evaluated across the 10\,km corridor. Table \ref{tab:conflict_breakdown} reports the conflict distribution stratified across the four interaction families.
+Under baseline experimental parameters (Seed: \texttt{12345}, Duration: 3,600\,s, Fleet: 1,244 vehicles), a total of \textbf{1,048 close proximity encounters} were evaluated across the 10\,km corridor. Table \ref{tab:conflict_breakdown} reports the conflict distribution stratified across the four interaction families.
 
 \begin{table}[h!]
 	\centering
 	\caption{Quantitative distribution of vehicular encounters and conflict severity tiers.}
 	\label{tab:conflict_breakdown}
-	\setlength{\tabcolsep}{8pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{tabular}{|l|r|r|r|r|r|}
+	\setlength{\tabcolsep}{5pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|r|r|r|r|r|}
 		\hline
-		\textbf{Interaction Family} & \textbf{Total Encounters} & \textbf{Safe Pass} & \textbf{Close Pass} & \textbf{Severe Incident} & \textbf{Mean Clearance} \\
+		\textbf{Interaction Family} & \textbf{Encounters} & \textbf{Safe Pass} & \textbf{Close Pass} & \textbf{Severe} & \textbf{Mean Clearance} \\
 		\hline
 		\hline
 		Bicycle $\leftrightarrow$ Passenger Car & 874 & 712 (81.5\%) & 141 (16.1\%) & 21 (2.4\%) & 1.74\,m $\pm$ 0.38\,m \\
@@ -33,7 +33,7 @@ Under baseline experimental parameters (Seed: \texttt{12345}, Duration: 3,600\,s
 		\hline
 		\textbf{Aggregate Fleet} & \textbf{1,048} & \textbf{848 (80.9\%)} & \textbf{171 (16.3\%)} & \textbf{29 (2.8\%)} & \textbf{1.69\,m $\pm$ 0.37\,m} \\
 		\hline
-	\end{tabular}
+	\end{tabularx}
 \end{table}
 
 \subsection{Key Empirical Observations}
@@ -50,18 +50,18 @@ To evaluate the efficacy of the trained XGBoost model against conventional thres
 	\centering
 	\caption{Performance comparison between rule-based distance thresholding and XGBoost classifier.}
 	\label{tab:ml_comparison}
-	\setlength{\tabcolsep}{10pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{tabular}{|l|r|r|r|r|}
+	\setlength{\tabcolsep}{8pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|r|r|r|r|}
 		\hline
-		\textbf{Detection Method} & \textbf{Precision} & \textbf{Recall} & \textbf{$F_1$-Score} & \textbf{False Positive Rate} \\
+		\textbf{Detection Method} & \textbf{Precision} & \textbf{Recall} & \textbf{$F_1$-Score} & \textbf{False Pos Rate} \\
 		\hline
 		\hline
 		Static Threshold ($d < 1.5\,\text{m}$) & 64.2\% & 88.5\% & 74.4\% & 31.8\% \\
 		Two-Tier Threshold ($d < 1.2\,\text{m} / 1.5\,\text{m}$) & 76.1\% & 82.0\% & 78.9\% & 18.4\% \\
 		\textbf{CycleSafe XGBoost Model} & \textbf{91.8\%} & \textbf{89.4\%} & \textbf{90.6\%} & \textbf{6.2\%} \\
 		\hline
-	\end{tabular}
+	\end{tabularx}
 \end{table}
 
 As shown in Table \ref{tab:ml_comparison}, the static 1.5\,m rule incurs a high False Positive Rate (31.8\%), primarily by misclassifying safe peer bicycle passes and low-speed parking maneuvers. In contrast, the XGBoost classifier achieves an $F_1$-score of \textbf{90.6\%} with a False Positive Rate of only \textbf{6.2\%}, demonstrating the necessity of multi-feature kinematic fusion.
@@ -69,23 +69,23 @@ As shown in Table \ref{tab:ml_comparison}, the static 1.5\,m rule incurs a high 
 \section{Sensitivity and Ablation Analysis}
 
 \subsection{Sublane Lateral Resolution Sensitivity}
-The spatial fidelity of overtaking maneuvers in SUMO is directly dictated by the \texttt{--lateral-resolution} sublane parameter. An ablation experiment was conducted comparing a coarse 0.5\,m lateral resolution against the fine 0.2\,m resolution implemented in CycleSafe (Table \ref{tab:ablation_sublane}).
+The spatial fidelity of overtaking maneuvers in SUMO is directly dictated by the sublane lateral resolution parameter (\texttt{--lateral-resolution}). An ablation experiment was conducted comparing a coarse 0.5\,m lateral resolution against the fine 0.2\,m resolution implemented in CycleSafe (Table \ref{tab:ablation_sublane}).
 
 \begin{table}[h!]
 	\centering
 	\caption{Ablation analysis of lateral simulation resolution in SUMO.}
 	\label{tab:ablation_sublane}
 	\setlength{\tabcolsep}{8pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{tabular}{|l|r|r|r|}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|r|r|r|}
 		\hline
-		\textbf{Lateral Resolution} & \textbf{Overtaking Events Recorded} & \textbf{Close Passes ($< 1.5\,\text{m}$)} & \textbf{Simulation Runtime (s)} \\
+		\textbf{Lateral Resolution} & \textbf{Encounters Recorded} & \textbf{Close Passes ($< 1.5\,\text{m}$)} & \textbf{Runtime (s)} \\
 		\hline
 		\hline
 		Coarse Grid (0.50\,m) & 742 & 98 (13.2\%) & 14.2\,s \\
 		\textbf{Fine Grid (0.20\,m, CycleSafe)} & \textbf{1,048} & \textbf{200 (19.1\%)} & \textbf{22.6\,s} \\
 		\hline
-	\end{tabular}
+	\end{tabularx}
 \end{table}
 
 At 0.5\,m resolution, vehicle lane-change trajectories are quantized into discrete blocks, causing overtaking vehicles to snap abruptly into adjacent lanes and artificially inflating clearances. At 0.2\,m resolution, emergent encroachment into the cycle lane is captured accurately, revealing 41.2\% more close passes.

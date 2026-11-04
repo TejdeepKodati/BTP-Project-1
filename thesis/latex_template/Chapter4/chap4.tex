@@ -12,29 +12,29 @@ Figure \ref{fig:arch_diagram} visualizes the cross-layer system dataflow and com
 
 \begin{figure}[h!]
 	\centering
-	\begin{adjustbox}{width=0.95\textwidth}
-	\begin{tabular}{|c|c|c|}
+	\setlength{\tabcolsep}{5pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\linewidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 		\hline
-		\multicolumn{3}{|c|}{\textbf{LAYER 1: EMBEDDED PHYSICAL TELEMETRY NODE (Edge Hardware)}} \\
+		\multicolumn{3}{|>{\centering\arraybackslash}p{\dimexpr\linewidth-2\tabcolsep-2\arrayrulewidth}|}{\textbf{LAYER 1: EMBEDDED PHYSICAL TELEMETRY NODE (Edge Hardware)}} \\
 		\hline
-		\textbf{Ranging \& Kinematics} & \textbf{Microcontroller \& Processing} & \textbf{Power \& User Interface} \\
-		Dual JSN-SR04T Ultrasonic (20\,Hz) & ESP32 Dual-Core Xtensa LX6 (240\,MHz) & 18650 Li-ion 2500\,mAh (3.7\,V) \\
-		MPU-6050 6-Axis IMU (I2C: 0x68) & FreeRTOS Dual-Task Architecture & TP4056 Type-C Charger + Protection \\
-		u-blox NEO-6M GPS (UART2 @ 9600) & FAT32 MicroSD SPI Data Logger & AMS1117-3.3V Low-Dropout Regulator \\
-		Handlebar Event Button (12\,mm) & I2C Shared Bus (GPIO 21/22) & 0.96" SSD1306 OLED (I2C: 0x3C) \\
+		\textbf{Ranging \& Kinematics} & \textbf{Microcontroller \& Compute} & \textbf{Power \& User Interface} \\
+		Dual JSN-SR04T (20\,Hz) & ESP32 Dual-Core (240\,MHz) & 18650 Li-ion 2500\,mAh (3.7\,V) \\
+		MPU-6050 6-Axis IMU & FreeRTOS Dual-Task System & TP4056 Type-C Charger \\
+		u-blox NEO-6M GPS & FAT32 MicroSD SPI Logger & AMS1117-3.3V LDO Rail \\
+		Handlebar Button (12\,mm) & I2C Bus (GPIO 21/22) & 0.96" SSD1306 OLED \\
 		\hline
-		\multicolumn{3}{|c|}{$\Downarrow$ \textit{Standardized Telemetry CSV Schema} $\{t,\, \text{lat},\, \text{lon},\, d_L,\, d_R,\, a_x,\, a_y,\, a_z,\, \text{btn}\} \Downarrow$} \\
+		\multicolumn{3}{|>{\centering\arraybackslash}p{\dimexpr\linewidth-2\tabcolsep-2\arrayrulewidth}|}{$\Downarrow$ \textit{Standardized Telemetry CSV Schema} $\{t,\, \text{lat},\, \text{lon},\, d_L,\, d_R,\, a_x,\, a_y,\, a_z,\, \text{btn}\} \Downarrow$} \\
 		\hline
-		\multicolumn{3}{|c|}{\textbf{LAYER 2: MICROSCOPIC SIMULATION \& MACHINE LEARNING PLATFORM (Server)}} \\
+		\multicolumn{3}{|>{\centering\arraybackslash}p{\dimexpr\linewidth-2\tabcolsep-2\arrayrulewidth}|}{\textbf{LAYER 2: MICROSCOPIC SIMULATION \& ML PLATFORM (Server)}} \\
 		\hline
 		\textbf{Simulation Subsystem} & \textbf{Machine Learning Engine} & \textbf{Web Application \& Storage} \\
-		Eclipse SUMO 1.27.1 + TraCI & XGBoost 3-Class Gradient Booster & Go 1.23 REST API Service \\
-		10\,km Berlin Arterial Corridor & Trained on TU Berlin SimRA Data & PostgreSQL 16 (Timescale Schema) \\
-		1,244 Stochastic Vehicles (12h Census) & StVO \S\,5(4) Distance Rule Encoders & Redis 7 (In-Memory Job Cache) \\
-		Sublane Lateral Dynamics (0.2\,m) & Modal Severity Weighting Matrix & Leaflet Map + Chart.js Dashboard \\
+		Eclipse SUMO 1.27.1 + TraCI & XGBoost 3-Class Booster & Go 1.23 REST API Service \\
+		10\,km Berlin Arterial Corridor & Trained on SimRA Dataset & PostgreSQL 16 Relational DB \\
+		1,244 Stochastic Vehicles & StVO \S\,5(4) Rule Encoders & Redis 7 In-Memory Cache \\
+		Sublane Lateral Dynamics (0.2\,m) & Modal Severity Matrix & Leaflet + Chart.js Interface \\
 		\hline
-	\end{tabular}
-	\end{adjustbox}
+	\end{tabularx}
 	\caption{End-to-end architectural dataflow of the CycleSafe platform.}
 	\label{fig:arch_diagram}
 \end{figure}
@@ -68,22 +68,18 @@ During cornering and pedaling, the bicycle frame tilts at an instantaneous roll 
 
 \begin{figure}[h!]
 	\centering
-	\begin{adjustbox}{width=0.85\textwidth}
-	\begin{tabular}{|c|}
-		\hline
-		\textbf{GEOMETRIC TILT COMPENSATION MODEL} \\
-		\hline
-		\\[-0.5em]
-		$\begin{aligned}
-			\text{Gravitational Vector: } &\quad \mathbf{g} = [0, 0, -9.81]^T \\
-			\text{Measured Acceleration: } &\quad \mathbf{a} = [a_x, a_y, a_z]^T \quad (\text{from MPU-6050}) \\
-			\text{Roll Angle Formulation: } &\quad \phi = \arctan\left(\frac{a_y}{\sqrt{a_x^2 + a_z^2}}\right) \\
-			\text{Corrected Horizontal Clearance: } &\quad d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
-		\end{aligned}$ \\
-		\\[-0.5em]
-		\hline
-	\end{tabular}
-	\end{adjustbox}
+	\fbox{
+		\parbox{0.88\linewidth}{
+			\vspace{4pt}
+			\centering\textbf{\large Dynamic Roll-Angle Tilt Compensation Model}\\[8pt]
+			$\begin{aligned}
+				\text{Gravitational Vector: } &\quad \mathbf{g} = [0, 0, -9.81]^T \\
+				\text{Measured Acceleration: } &\quad \mathbf{a} = [a_x, a_y, a_z]^T \quad (\text{from MPU-6050}) \\
+				\text{Roll Angle Formulation: } &\quad \phi = \arctan\left(\frac{a_y}{\sqrt{a_x^2 + a_z^2}}\right) \\
+				\text{Corrected Horizontal Clearance: } &\quad d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
+			\end{aligned}$\\[6pt]
+		}
+	}
 	\caption{Formulation of dynamic roll-angle tilt compensation.}
 	\label{fig:tilt_geometry}
 \end{figure}
@@ -144,7 +140,7 @@ The models and simulations in CycleSafe are calibrated using two empirical open-
 \end{enumerate}
 
 \section{Ethics, Privacy, and Data Governance}
-Because cycling telemetry captures fine-grained spatiotemporal trajectories that could reveal residential addresses or personal daily routines, CycleSafe incorporates privacy-by-design principles compliant with European Union General Data Protection Regulation (GDPR) standards:
+Because cycling telemetry captures fine-grained spatiotemporal trajectories that could reveal residential addresses or personal daily routines, CycleSafe incorporates privacy-by-design principles aligned with EU General Data Protection Regulation (GDPR) standards:
 \begin{itemize}
     \item \textbf{No Optical Surveillance:} The telemetry unit relies entirely on ultrasonic time-of-flight acoustic pulses and inertial sensors; no video cameras or facial recognition systems are deployed.
     \item \textbf{Spatial Obfuscation at Trip Terminals:} In production ingestion, the initial and concluding 200 meters of recorded GPS tracks are clipped to prevent home or workplace deanonymization.

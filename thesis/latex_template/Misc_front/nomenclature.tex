@@ -6,12 +6,12 @@
 \section*{List of Abbreviations}
 \begin{table}[h!]
 	\centering
-	\setlength{\tabcolsep}{12pt}
-	\renewcommand{\arraystretch}{1.3}
-	\begin{tabular}{p{3.5cm}p{11cm}}
-		\hline
+	\setlength{\tabcolsep}{10pt}
+	\renewcommand{\arraystretch}{1.25}
+	\begin{tabularx}{\textwidth}{p{3.2cm}X}
+		\toprule
 		\textbf{Abbreviation} & \textbf{Full Form / Definition} \\
-		\hline
+		\midrule
 		\textbf{BTP} & Bachelor of Technology Project \\
 		\textbf{CSE} & Computer Science and Engineering \\
 		\textbf{ESP32} & Espressif Systems 32-bit Dual-Core Microcontroller \\
@@ -37,19 +37,20 @@
 		\textbf{TTC} & Time-to-Collision \\
 		\textbf{VRU} & Vulnerable Road User \\
 		\textbf{XGBoost} & Extreme Gradient Boosting Machine Learning \\
-		\hline
-	\end{tabular}
+		\bottomrule
+	\end{tabularx}
 \end{table}
 
+\clearpage
 \section*{List of Mathematical Symbols}
 \begin{table}[h!]
 	\centering
-	\setlength{\tabcolsep}{12pt}
-	\renewcommand{\arraystretch}{1.3}
-	\begin{tabular}{p{3.5cm}p{11cm}}
-		\hline
+	\setlength{\tabcolsep}{10pt}
+	\renewcommand{\arraystretch}{1.25}
+	\begin{tabularx}{\textwidth}{p{3.2cm}X}
+		\toprule
 		\textbf{Symbol} & \textbf{Meaning / Definition [Units]} \\
-		\hline
+		\midrule
 		$d_{\text{measured}}$ & Raw acoustic distance recorded by ultrasonic transducer [m] \\
 		$d_{\text{true}}$ & Perpendicular ground clearance corrected for frame roll tilt [m] \\
 		$\phi$ & Instantaneous bicycle frame roll / tilt angle [rad or deg] \\
@@ -60,6 +61,6 @@
 		$c(T)$ & Speed of sound in ambient air at temperature $T$ [$\text{m/s}$] \\
 		$s_0$ & Minimum jam distance in Intelligent Driver Model [m] \\
 		$T$ & Desired safe headway time gap in IDM [s] \\
-		\hline
-	\end{tabular}
+		\bottomrule
+	\end{tabularx}
 \end{table}

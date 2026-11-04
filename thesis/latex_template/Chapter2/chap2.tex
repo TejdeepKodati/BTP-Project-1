@@ -47,32 +47,30 @@ To contextualize the CycleSafe contribution within the current technological lan
 	\centering
 	\caption{Comparative benchmarking of cycling safety evaluation platforms.}
 	\label{tab:lit_comparison}
-	\setlength{\tabcolsep}{6pt}
-	\renewcommand{\arraystretch}{1.3}
-	\begin{adjustbox}{width=\textwidth}
-	\begin{tabular}{|p{3.2cm}|p{2.6cm}|p{2.8cm}|p{2.6cm}|p{3.4cm}|}
+	\setlength{\tabcolsep}{5pt}
+	\renewcommand{\arraystretch}{1.25}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash\bfseries}p{3.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 		\hline
-		\textbf{Evaluation Dimension} & \textbf{ProxiCycle} & \textbf{SimRA (TU Berlin)} & \textbf{OpenBikeSensor (OBS)} & \textbf{CycleSafe (This Work)} \\
+		\textbf{Criteria} & \textbf{ProxiCycle} & \textbf{SimRA} & \textbf{OpenBikeSensor} & \textbf{CycleSafe (Ours)} \\
 		\hline
 		\hline
-		\textbf{Core Hardware Architecture} & Arduino / Raspberry Pi & Smartphone (Android/iOS) & ESP32 Dual-Core DevKit & ESP32 + MPU-6050 6-Axis IMU \\
+		Core Hardware & Arduino / RPi & Smartphone & ESP32 Dual-Core & ESP32 + MPU-6050 \\
 		\hline
-		\textbf{Ranging Technology} & Infrared / Ultrasonic & None (Inertial only) & Dual Ultrasonic (JSN-SR04T) & Dual Ultrasonic (JSN-SR04T) \\
+		Ranging Sensors & IR / Ultrasonic & None (Inertial) & Dual JSN-SR04T & Dual JSN-SR04T \\
 		\hline
-		\textbf{Distance Output} & Binary (Passing / Clear) & Subjective rider annotation & Continuous metric distance (cm) & Continuous metric distance (cm) \\
+		Distance Output & Binary flag & Subjective survey & Continuous (cm) & Continuous (cm) \\
 		\hline
-		\textbf{Dynamic Tilt Compensation} & None & None & None & Real-time Accelerometer Roll Model ($\phi = \arctan(a_y / \sqrt{a_x^2 + a_z^2})$) \\
+		Tilt Compensation & None & None & None & Roll Model ($\phi = \arctan\frac{a_y}{\sqrt{a_x^2+a_z^2}}$) \\
 		\hline
-		\textbf{Vehicle Class Discrimination} & None & User post-ride survey & Generic ultrasonic envelope & Supervised XGBoost Classifier (Truck / Car / Moto / Bike) \\
+		Vehicle Taxonomy & None & Post-ride survey & Generic acoustic & XGBoost Classifier \\
 		\hline
-		\textbf{Microscopic Simulation Twin} & None & None & None & 10\,km SUMO TraCI Digital Twin (1,244 Vehicles) \\
+		Simulation Twin & None & None & None & 10\,km SUMO TraCI (1,244 Veh) \\
 		\hline
-		\textbf{Power Supply Reliability} & Unregulated 5\,V Rail & Phone internal battery & Shared single rail & Dedicated AMS1117-3.3V LDO Rail \\
+		Power Reliability & Unregulated & Internal battery & Shared rail & Dedicated AMS1117 LDO \\
 		\hline
-		\textbf{Web Telemetry Export} & None & Web portal (KML/CSV) & Web portal (JSON) & Full-Stack REST API + Instant CSV Export \\
+		Telemetry Export & None & KML / CSV & Web JSON & REST API + Instant CSV \\
 		\hline
-	\end{tabular}
-	\end{adjustbox}
+	\end{tabularx}
 \end{table}
 
 \section{Identified Research Gaps}

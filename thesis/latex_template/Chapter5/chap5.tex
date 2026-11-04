@@ -8,9 +8,9 @@ The CycleSafe computational environment is designed for containerized reproducib
 \begin{itemize}
     \item \textbf{Host Environment:} Windows 11 Enterprise / Ubuntu 22.04 LTS, Docker Engine v27.0 with Docker Compose v2.28.
     \item \textbf{Backend Core:} Go 1.23 standard library HTTP multiplexer, \texttt{pgx/v5} PostgreSQL driver, \texttt{go-redis/v9}.
-    \item \textbf{Simulation Service:} Eclipse SUMO 1.27.1, Python 3.12, \texttt{traci} socket client, \texttt{xgboost} v2.0, \texttt{numpy}, \texttt{scipy}.
-    \item \textbf{Database and In-Memory Cache:} PostgreSQL 16 on Debian Bookworm with relational tables for rides, points, incidents, and metadata; Redis 7 for asynchronous job queuing and lock coordination.
-    \item \textbf{Frontend Interface:} Nginx alpine reverse proxy, Vanilla JavaScript (ES2022), Leaflet v1.9.4 with Canvas marker rendering, Chart.js v4.4.1.
+    \item \textbf{Simulation Service:} Eclipse SUMO 1.27.1, Python 3.12, TraCI socket client, \texttt{xgboost} v2.0, \texttt{numpy}, \texttt{scipy}.
+    \item \textbf{Database \& Cache:} PostgreSQL 16 on Debian Bookworm with relational tables for rides and incidents; Redis 7 for job queuing.
+    \item \textbf{Frontend Interface:} Nginx alpine proxy, Vanilla JavaScript (ES2022), Leaflet v1.9.4 with Canvas rendering, Chart.js v4.4.1.
 \end{itemize}
 
 \section{Hardware Telemetry Implementation}
@@ -21,14 +21,13 @@ To ensure practical feasibility within academic budget constraints, all componen
 
 \begin{table}[h!]
 	\centering
-	\caption{Final verified Bill of Materials (BOM) for CycleSafe telemetry node.}
+	\caption{Final verified Bill of Materials (BOM) for CycleSafe telemetry node (verified with active shipping to IIT (ISM) Dhanbad, PIN: 826004).}
 	\label{tab:bom_table}
 	\setlength{\tabcolsep}{8pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{adjustbox}{width=\textwidth}
-	\begin{tabular}{|l|l|l|r|}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{3.5cm}|r|}
 		\hline
-		\textbf{Component Description} & \textbf{Specification / Model} & \textbf{Supplier (Delivers to Dhanbad 826004)} & \textbf{Cost (INR)} \\
+		\textbf{Component Description} & \textbf{Specification / Model} & \textbf{Supplier} & \textbf{Cost (INR)} \\
 		\hline
 		\hline
 		ESP32 Microcontroller (1 Unit) & DEVKIT V1 30-Pin CP2102 & Amazon India & 490 \\
@@ -43,14 +42,13 @@ To ensure practical feasibility within academic budget constraints, all componen
 		Battery Charger Module (1 Unit) & TP4056 Type-C with Protection & Amazon India & 39 \\
 		Voltage Regulator Module (1 Unit) & AMS1117-3.3V Step-Down & Quartz Components & 18 \\
 		Momentary Push Button (1 Unit) & 12mm Waterproof Panel Mount & Amazon India & 228 \\
-		Custom 2-Layer PCB (5 Boards) & OpenBikeSensor v00.03 FR-4 & LionCircuits Bangalore & 450 \\
+		Custom 2-Layer PCB (5 Boards) & OpenBikeSensor v00.03 FR-4 & LionCircuits & 450 \\
 		3D Printed Enclosure (1 Unit) & PETG Weatherproof Housing & Think3D India & 350 \\
-		Lab Connectors \& Wire Harness & JST-XH 4-Pin, Standoffs, Solder & Department Lab Stock & 0 \\
+		Lab Connectors \& Wire Harness & JST-XH 4-Pin, Standoffs, Solder & Department Lab & 0 \\
 		\hline
-		\multicolumn{3}{|l|}{\textbf{Total Estimated Procurement Cost (INR)}} & \textbf{3,494} \\
+		\multicolumn{3}{|l|}{\textbf{Total System Procurement Cost (INR)}} & \textbf{3,494} \\
 		\hline
-	\end{tabular}
-	\end{adjustbox}
+	\end{tabularx}
 \end{table}
 
 \subsection{Complete Microcontroller Pinout Allocation}
@@ -60,9 +58,9 @@ Table \ref{tab:pinout_table} documents the complete pin mapping on the 30-pin ES
 	\centering
 	\caption{ESP32 30-pin microcontroller GPIO allocation and electrical bus mapping.}
 	\label{tab:pinout_table}
-	\setlength{\tabcolsep}{10pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{tabular}{|l|l|l|l|}
+	\setlength{\tabcolsep}{8pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash\bfseries}p{2.5cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{4.0cm}|}
 		\hline
 		\textbf{ESP32 Pin} & \textbf{Peripheral Device} & \textbf{Signal Function} & \textbf{Operating Rail} \\
 		\hline
@@ -73,17 +71,17 @@ Table \ref{tab:pinout_table} documents the complete pin mapping on the 30-pin ES
 		GPIO 17 & u-blox NEO-6M GPS & Hardware UART2 TXD & 3.3\,V Logic \\
 		GPIO 5  & MicroSD Breakout Board & SPI Chip Select (CS) & 3.3\,V Regulated \\
 		GPIO 18 & MicroSD Breakout Board & SPI Clock (SCK) & 3.3\,V Regulated \\
-		GPIO 19 & MicroSD Breakout Board & SPI Master-In Slave-Out (MISO) & 3.3\,V Regulated \\
-		GPIO 23 & MicroSD Breakout Board & SPI Master-Out Slave-In (MOSI) & 3.3\,V Regulated \\
+		GPIO 19 & MicroSD Breakout Board & SPI MISO & 3.3\,V Regulated \\
+		GPIO 23 & MicroSD Breakout Board & SPI MOSI & 3.3\,V Regulated \\
 		GPIO 25 & Left JSN-SR04T Sensor & Ultrasonic Trigger Pulse & 3.3\,V Logic (5\,V VCC) \\
 		GPIO 26 & Left JSN-SR04T Sensor & Ultrasonic Echo Duration & 3.3\,V Logic (Divider) \\
 		GPIO 27 & Right JSN-SR04T Sensor & Ultrasonic Trigger Pulse & 3.3\,V Logic (5\,V VCC) \\
 		GPIO 14 & Right JSN-SR04T Sensor & Ultrasonic Echo Duration & 3.3\,V Logic (Divider) \\
-		GPIO 4  & Handlebar Push Button & Interrupt Input (Event Trigger) & Internal Pullup \\
-		3V3     & Sensors, IMU, SD Card & Main Clean Voltage Rail & 3.3\,V LDO (AMS1117) \\
+		GPIO 4  & Handlebar Push Button & Interrupt Input & Internal Pullup \\
+		3V3     & Sensors, IMU, SD Card & Clean Regulated Rail & 3.3\,V LDO (AMS1117) \\
 		GND     & All Subsystems & Common Ground Plane & 0\,V \\
 		\hline
-	\end{tabular}
+	\end{tabularx}
 \end{table}
 
 \subsection{Mechanical Enclosure and 3D Print Parameters}
@@ -114,21 +112,21 @@ Traffic injection rates are calibrated against the official Berlin Senate Oberba
 	\centering
 	\caption{Stochastic vehicle population parameterized for 60-minute SUMO simulation.}
 	\label{tab:sim_demand}
-	\setlength{\tabcolsep}{10pt}
-	\renewcommand{\arraystretch}{1.25}
-	\begin{tabular}{|l|r|r|r|l|}
+	\setlength{\tabcolsep}{6pt}
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash\bfseries}p{3.8cm}|r|r|r|X|}
 		\hline
-		\textbf{Vehicle Class} & \textbf{12h Census} & \textbf{Hourly Mean} & \textbf{Simulated Fleet} & \textbf{SUMO Model Parameters} \\
+		\textbf{Vehicle Class} & \textbf{12h Census} & \textbf{Hourly Mean} & \textbf{Simulated} & \textbf{SUMO Model Parameters} \\
 		\hline
 		\hline
-		\textbf{Commuter Bicycles} & 1,397 & 116.4 & \textbf{115} & $v_{\text{max}} = 5.0\,\text{m/s}, a = 1.2, d = 3.0$ \\
-		\textbf{Passenger Cars} & 12,260 & 1,021.7 & \textbf{1,024} & $v_{\text{max}} = 13.5\,\text{m/s}, a = 2.6, d = 4.5$ \\
-		\textbf{Motorcycles (Krad)} & 595 & 49.6 & \textbf{52} & $v_{\text{max}} = 13.0\,\text{m/s}, a = 3.0, d = 5.0$ \\
-		\textbf{Heavy Trucks \& Buses} & 676 & 56.3 & \textbf{53} & $v_{\text{max}} = 11.0\,\text{m/s}, a = 1.3, d = 4.0$ \\
+		Commuter Bicycles & 1,397 & 116.4 & \textbf{115} & $v_{\text{max}} = 5.0\,\text{m/s}, a = 1.2, d = 3.0$ \\
+		Passenger Cars & 12,260 & 1,021.7 & \textbf{1,024} & $v_{\text{max}} = 13.5\,\text{m/s}, a = 2.6, d = 4.5$ \\
+		Motorcycles (Krad) & 595 & 49.6 & \textbf{52} & $v_{\text{max}} = 13.0\,\text{m/s}, a = 3.0, d = 5.0$ \\
+		Heavy Trucks \& Buses & 676 & 56.3 & \textbf{53} & $v_{\text{max}} = 11.0\,\text{m/s}, a = 1.3, d = 4.0$ \\
 		\hline
-		\textbf{Total Fleet} & \textbf{14,928} & \textbf{1,244.0} & \textbf{1,244} & Total Simulated Duration: 3,600\,s \\
+		\textbf{Total Fleet} & \textbf{14,928} & \textbf{1,244.0} & \textbf{1,244} & Duration: 3,600\,s ($\Delta t = 0.5\,\text{s}$) \\
 		\hline
-	\end{tabular}
+	\end{tabularx}
 \end{table}
 
 Vehicle departure timestamps $t_{\text{depart}} \in [0, 3600]$ are generated via a Poisson process. The simulation step size is set to $\Delta t = 0.5\,\text{s}$ (7,201 total simulation steps). Lane assignments adhere to German right-hand driving rules (\textit{Rechtsfahrgebot}): 65\% of motor vehicles depart in the primary mixed right lane, while 35\% depart in the left passing lane.
@@ -143,4 +141,4 @@ The quantitative performance of the classification engine and conflict detection
 In the kinematic domain, conflict severity is benchmarked using Minimum Passing Distance ($d_{\text{min}}$), Peak Longitudinal Deceleration ($a_{\text{min}}$), and Time-to-Collision ($\text{TTC}$).
 
 \section{Reproducibility Protocols}
-All simulation configurations (\texttt{nodes.nod.xml}, \texttt{edges.edg.xml}, \texttt{corridor\_route.json}), Python TraCI orchestrators (\texttt{runner.py}, \texttt{predictor.py}), and trained model weights (\texttt{xgboost\_safety\_model.json}) are tracked under Git version control. By setting an explicit integer seed (e.g., \texttt{--seed 12345}), any experiment reported in this work can be reproduced identically with bit-level determinism.
+All simulation configurations (\texttt{nodes.nod.xml}, \texttt{edges.edg.xml}, and \texttt{corridor\_route.json}), Python TraCI orchestrators (\texttt{runner.py} and \texttt{predictor.py}), and trained model weights (\texttt{xgboost\_safety\_model.json}) are tracked under Git version control. By setting an explicit integer seed (e.g., \texttt{--seed 12345}), any experiment reported in this work can be reproduced identically with bit-level determinism.
