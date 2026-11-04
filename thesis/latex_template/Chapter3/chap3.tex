@@ -49,49 +49,39 @@ To ensure practical field utility and academic reliability, the platform satisfi
     \item \textbf{Vehicle Modal Homogeneity:} Within each vehicle class (passenger cars, trucks, motorcycles, bicycles), physical dimensions and maximum braking decelerations follow standard German federal fleet parameters defined in the SUMO vehicle type definitions.
 \end{enumerate}
 
-\section{Formal Problem Definition}
-Let the state of the instrumented ego bicycle at discrete simulation timestamp $t$ be defined by the tuple:
-\begin{equation}
-    S_{\text{ego}}(t) = \left( \mathbf{p}_{\text{ego}}(t), v_{\text{ego}}(t), a_{\text{ego}}(t), \phi(t) \right)
-\end{equation}
-where $\mathbf{p}_{\text{ego}}(t) = (\lambda_{\text{ego}}(t), \mu_{\text{ego}}(t))$ denotes the WGS84 geographic coordinate (longitude, latitude), $v_{\text{ego}}(t)$ is the scalar longitudinal velocity, $a_{\text{ego}}(t)$ is the acceleration vector, and $\phi(t)$ is the frame roll tilt angle.
+\section{Problem Definition and Safety Criteria}
+The primary objective of the CycleSafe platform is to continuously monitor the spatial separation between a commuter bicycle and neighboring motorized vehicles, and to classify passing encounters based on established road safety standards.
 
-Similarly, let a motorized counterpart vehicle $k \in \{1, 2, \dots, K\}$ operating in spatial proximity be represented by:
-\begin{equation}
-    S_{k}(t) = \left( \mathbf{p}_{k}(t), v_{k}(t), a_{k}(t), C_{k}, L_{k}, W_{k} \right)
-\end{equation}
-where $C_{k} \in \{\text{car}, \text{truck}, \text{motorbike}, \text{bike}\}$ denotes the counterpart vehicle class, and $L_{k}, W_{k}$ represent bounding length and width dimensions.
+At any given timestamp $t$, the dynamic state of the bicycle is characterized by its GPS geographic coordinates $(\text{latitude}, \text{longitude})$, forward velocity $v_{\text{ego}}$, acceleration $a_{\text{ego}}$, and frame tilt/roll angle $\phi$. Similarly, each neighboring motorized vehicle is characterized by its position, velocity, and vehicle classification (passenger car, truck, bus, or motorcycle).
 
-\subsection{Edge-to-Edge Spatial Clearance}
-The true physical clearance $d_{\text{clear}}(t, k)$ between the lateral bounding edge of the bicycle and the nearest lateral surface of the counterpart vehicle is formulated as:
+\subsection{Lateral Spatial Clearance}
+The physical clearance $d_{\text{clear}}$ represents the net lateral separation between the bicycle's outermost boundary (handlebar tip) and the closest lateral edge of the passing vehicle (e.g., side mirror). Geometrically, this is expressed as:
 \begin{equation}
-    d_{\text{clear}}(t, k) = \max \left( 0,\, \|\mathbf{p}_{k}(t) - \mathbf{p}_{\text{ego}}(t)\| - \frac{W_{\text{ego}} + W_{k}}{2} \right)
+    d_{\text{clear}} = d_{\text{center}} - \frac{W_{\text{bike}} + W_{\text{vehicle}}}{2}
 \end{equation}
-In the physical hardware telemetry unit, this clearance is measured by the lateral ultrasonic transducer and corrected for roll angle:
-\begin{equation}
-    d_{\text{true}}(t) = d_{\text{measured}}(t) \cdot \cos\left( \phi(t) \right)
-\end{equation}
+where $d_{\text{center}}$ is the lateral distance between vehicle centerlines, and $W_{\text{bike}}$ and $W_{\text{vehicle}}$ denote the respective widths of the bicycle and the passing vehicle. In the physical hardware telemetry unit, this clearance is measured directly by the lateral ultrasonic transducer and corrected for frame tilt.
 
-\subsection{Kinematic Conflict Metrics}
-To assess encounter criticality, two classical microscopic conflict metrics are formulated:
+\subsection{Kinematic Conflict Indicators}
+To evaluate the urgency of an encounter, two widely recognized traffic safety indicators are utilized:
 \begin{enumerate}
-    \item \textbf{Time-to-Collision (TTC):} When the counterpart vehicle approaches the bicycle from behind in the same or adjacent lane with relative closing velocity $\Delta v(t) = v_{k}(t) - v_{\text{ego}}(t) > 0$:
+    \item \textbf{Time-to-Collision (TTC):} When an overtaking vehicle approaches the bicycle from behind with a relative closing velocity $\Delta v = v_{\text{vehicle}} - v_{\text{bike}} > 0$, the time remaining before a potential collision is:
     \begin{equation}
-        \text{TTC}(t, k) = \frac{\Delta x_{\text{long}}(t, k)}{\Delta v(t)} = \frac{x_{k}(t) - x_{\text{ego}}(t)}{v_{\text{ego}}(t) - v_{k}(t)}
+        \text{TTC} = \frac{\Delta x}{\Delta v}
     \end{equation}
-    \item \textbf{Post-Encroachment Time (PET):} The temporal interval between the departure of the bicycle from a shared lane conflict zone and the arrival of the overtaking vehicle at the exact same spatial coordinates:
+    where $\Delta x$ is the longitudinal distance between the two vehicles along the travel lane. A lower TTC value indicates higher collision urgency.
+    \item \textbf{Post-Encroachment Time (PET):} In intersection or lane-merging scenarios where trajectories intersect, PET measures the time interval between the bicycle vacating a conflict point and the arrival of the motor vehicle at that identical spatial position:
     \begin{equation}
-        \text{PET} = t_{\text{arrival}}(k, \mathbf{p}^*) - t_{\text{departure}}(\text{ego}, \mathbf{p}^*)
+        \text{PET} = t_{\text{arrival}} - t_{\text{departure}}
     \end{equation}
 \end{enumerate}
 
-\subsection{Multi-Class Hazard Optimization}
-The classification objective is to map the multidimensional encounter observation vector $\mathbf{x} = [d_{\text{clear}},\, \Delta v,\, a_{\text{ego}},\, a_{k},\, C_{k}]$ into a discrete severity label $y \in \{0, 1, 2\}$:
+\subsection{Encounter Severity Classification}
+In accordance with urban cycling safety research and statutory overtaking guidelines (such as the German StVO \S\,5(4) minimum 1.5\,m rule), each passing event is classified into one of three operational severity tiers:
 \begin{equation}
-    y = \begin{cases}
-        0 & \text{(Safe Pass: StVO compliance, } d_{\text{clear}} \ge 1.5\,\text{m}) \\
-        1 & \text{(Close Pass Medium: } 1.0\,\text{m} \le d_{\text{clear}} < 1.5\,\text{m} \text{ or mild deceleration}) \\
-        2 & \text{(Severe Incident: } d_{\text{clear}} < 1.0\,\text{m} \text{ or emergency braking } a_{\text{ego}} \le -2.5\,\text{m/s}^2)
+    \text{Severity Tier} = \begin{cases}
+        \text{Safe Pass} & \text{if } d_{\text{clear}} \ge 1.5\,\text{m} \\
+        \text{Close Pass (Warning)} & \text{if } 1.0\,\text{m} \le d_{\text{clear}} < 1.5\,\text{m} \\
+        \text{Critical Incident} & \text{if } d_{\text{clear}} < 1.0\,\text{m}
     \end{cases}
 \end{equation}
-This formulation underpins the machine learning classification engine detailed in the following chapter.
+This tiered classification provides both real-time feedback to the rider and aggregated spatial statistics for urban road planners.

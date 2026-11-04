@@ -49,82 +49,72 @@ The selection of hardware components and software libraries is guided by strict 
     \item \textbf{Dedicated AMS1117-3.3V Power Regulation Rail:} During write operations, MicroSD cards draw transient current spikes exceeding 100\,mA, while the ESP32 RF subsystem draws up to 240\,mA during Wi-Fi beacon transmission. Supplying these peripherals from a dedicated low-dropout regulator isolated from the raw battery prevents voltage sagging below the 2.7\,V brownout threshold.
 \end{itemize}
 
-\section{Algorithms and Mathematical Models}
+\section{Algorithms and Operating Principles}
 
-\subsection{Acoustic Time-of-Flight Ranging Physics}
-The physical distance $d_{\text{measured}}$ from the ultrasonic transducer faceplate to the nearest reflecting vehicle surface is governed by the two-way acoustic Time-of-Flight equation:
+\subsection{Acoustic Time-of-Flight Distance Measurement}
+The distance $d_{\text{measured}}$ from the ultrasonic transducer faceplate to the nearest reflecting vehicle surface is governed by the two-way acoustic Time-of-Flight principle:
 \begin{equation}
-    d_{\text{measured}} = \frac{c(T) \cdot \Delta t}{2}
+    d_{\text{measured}} = \frac{c \cdot \Delta t}{2}
 \end{equation}
-where $\Delta t$ is the measured echo pulse duration (round-trip transit time in microseconds), and $c(T)$ is the acoustic propagation velocity in air. The speed of sound is sensitive to ambient air temperature $T$ ($^\circ\text{C}$):
-\begin{equation}
-    c(T) = 331.3 \cdot \sqrt{1 + \frac{T}{273.15}} \approx 331.3 + 0.606 \cdot T \quad [\text{m/s}]
-\end{equation}
-At standard ambient temperature ($20^\circ\text{C}$), $c(20) = 343.4\,\text{m/s}$, yielding a spatial resolution of $0.1717\,\text{mm}$ per microsecond of echo pulse duration.
+where $\Delta t$ is the measured echo pulse duration (round-trip transit time in microseconds), and $c$ is the speed of sound in air. At standard ambient room temperature ($20^\circ\text{C}$), $c \approx 343\,\text{m/s}$, yielding a spatial resolution of approximately $0.17\,\text{mm}$ per microsecond of echo pulse duration.
 
-\subsection{Analytical Dynamic Roll-Angle Tilt Compensation}
+\subsection{Dynamic Roll-Angle Tilt Compensation}
 \label{sec:tilt_comp}
-During cornering and pedaling, the bicycle frame tilts at an instantaneous roll angle $\phi$ relative to the true gravitational vertical. An uncompensated transducer rigidly mounted to the frame projects an inclined acoustic beam, measuring an oblique hypotenuse distance $d_{\text{measured}}$ rather than the true horizontal ground clearance $d_{\text{true}}$ (Figure \ref{fig:tilt_geometry}).
+During cornering and pedaling, the bicycle frame tilts at an instantaneous roll angle $\phi$ relative to the vertical. An uncompensated transducer rigidly mounted to the frame projects an inclined acoustic beam toward the ground, recording a slanted hypotenuse distance $d_{\text{measured}}$ rather than the true horizontal ground clearance $d_{\text{true}}$ (Figure \ref{fig:tilt_geometry}).
 
 \begin{figure}[h!]
 	\centering
 	\fbox{
 		\parbox{0.88\linewidth}{
 			\vspace{4pt}
-			\centering\textbf{\large Dynamic Roll-Angle Tilt Compensation Model}\\[8pt]
-			$\begin{aligned}
-				\text{Gravitational Vector: } &\quad \mathbf{g} = [0, 0, -9.81]^T \\
-				\text{Measured Acceleration: } &\quad \mathbf{a} = [a_x, a_y, a_z]^T \quad (\text{from MPU-6050}) \\
-				\text{Roll Angle Formulation: } &\quad \phi = \arctan\left(\frac{a_y}{\sqrt{a_x^2 + a_z^2}}\right) \\
-				\text{Corrected Horizontal Clearance: } &\quad d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
-			\end{aligned}$\\[6pt]
+			\centering\textbf{\large Dynamic Roll-Angle Tilt Compensation}\\[8pt]
+			\begin{itemize}
+				\item \textbf{Tilt Angle Measurement ($\phi$):} Monitored continuously via the onboard MPU-6050 3-axis accelerometer.
+				\item \textbf{Trigonometric Correction:} The true horizontal clearance to the passing vehicle is calculated as:
+				\begin{equation*}
+					d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
+				\end{equation*}
+				\item \textbf{Practical Example:} At a $20^\circ$ lean angle, an uncompensated reading of $1.60\,\text{m}$ corresponds to a true horizontal separation of $1.60 \times \cos(20^\circ) = 1.50\,\text{m}$.
+			\end{itemize}
+			\vspace{2pt}
 		}
 	}
-	\caption{Formulation of dynamic roll-angle tilt compensation.}
+	\caption{Geometric principle of dynamic roll-angle tilt compensation.}
 	\label{fig:tilt_geometry}
 \end{figure}
 
-The MPU-6050 IMU samples three-axis acceleration vectors $(a_x, a_y, a_z)$ at 100\,Hz. The instantaneous roll angle $\phi$ is calculated analytically using:
-\begin{equation}
-    \phi = \arctan\left( \frac{a_y}{\sqrt{a_x^2 + a_z^2}} \right)
-\end{equation}
-The true perpendicular ground clearance to the overtaking vehicle is then computed by projecting the measured hypotenuse onto the horizontal plane:
+The true horizontal clearance to the overtaking vehicle is thus determined by:
 \begin{equation}
     d_{\text{true}} = d_{\text{measured}} \cdot \cos(\phi)
 \end{equation}
-For example, if a cyclist leans into a corner at $\phi = 20^\circ$ and the sensor records $d_{\text{measured}} = 1.60\,\text{m}$, the uncompensated reading would classify the overtake as safe ($> 1.5\,\text{m}$), whereas the true horizontal distance is $d_{\text{true}} = 1.60 \cdot \cos(20^\circ) = 1.503\,\text{m}$, near the critical threshold.
+where $\phi$ is the instantaneous frame roll angle sampled from the IMU.
 
-\subsection{XGBoost Supervised Conflict Classification Engine}
+\subsection{Machine Learning Conflict Classification Engine}
 \label{sec:xgboost_formulation}
-Rather than applying a rigid, one-size-fits-all threshold of 1.5\,m regardless of context, CycleSafe employs an Extreme Gradient Boosting (\textbf{XGBoost}) \cite{chen2016xgboost} multi-class classifier. The feature vector $\mathbf{x}_i \in \mathbb{R}^6$ extracted for each vehicular encounter comprises:
+Rather than relying solely on a rigid distance threshold of 1.5\,m across all road conditions, CycleSafe utilizes an Extreme Gradient Boosting (\textbf{XGBoost}) multi-class classifier \cite{chen2016xgboost}. 
+
+For each detected encounter, the model extracts a compact feature vector of six observable metrics:
 \begin{equation}
-    \mathbf{x}_i = \left[ d_{\text{min}},\, v_{\text{ego}},\, v_{\text{other}},\, a_{\text{ego,min}},\, \Delta v,\, C_{\text{type}} \right]
+    \mathbf{x} = \left[ d_{\text{min}},\, v_{\text{ego}},\, v_{\text{other}},\, a_{\text{ego,min}},\, \Delta v,\, C_{\text{type}} \right]
 \end{equation}
 where:
 \begin{itemize}
     \item $d_{\text{min}}$ is the minimum roll-compensated clearance observed during the encounter [m],
-    \item $v_{\text{ego}}, v_{\text{other}}$ are the instantaneous velocities of bicycle and vehicle [m/s],
-    \item $a_{\text{ego,min}}$ is the peak longitudinal deceleration recorded by the cyclist [$\text{m/s}^2$],
+    \item $v_{\text{ego}}, v_{\text{other}}$ are the forward velocities of the bicycle and passing vehicle [m/s],
+    \item $a_{\text{ego,min}}$ is the peak braking deceleration recorded by the cyclist [$\text{m/s}^2$],
     \item $\Delta v = v_{\text{other}} - v_{\text{ego}}$ is the relative overtaking velocity [m/s],
-    \item $C_{\text{type}} \in \{0: \text{bike}, 1: \text{car}, 2: \text{truck/bus}, 3: \text{motorbike}\}$ is the integer-encoded vehicle class.
+    \item $C_{\text{type}}$ is the counterpart vehicle category (bicycle, passenger car, truck/bus, or motorcycle).
 \end{itemize}
 
-The XGBoost model minimizes a regularized objective function across $K$ additive decision trees:
-\begin{equation}
-    \mathcal{L}(\Theta) = \sum_{i=1}^{N} l\left( y_i, \hat{y}_i \right) + \sum_{k=1}^{K} \Omega(f_k)
-\end{equation}
-where the loss function $l$ is multi-class cross-entropy, and the tree complexity regularization term $\Omega(f_k)$ penalizes leaf count $T$ and weight vector $\mathbf{w}$:
-\begin{equation}
-    \Omega(f_k) = \gamma T + \frac{1}{2}\lambda \sum_{j=1}^{T} w_j^2
-\end{equation}
-The optimal split at each node is determined by maximizing the split gain criterion:
-\begin{equation}
-    \text{Gain} = \frac{1}{2} \left[ \frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda} \right] - \gamma
-\end{equation}
-where $G$ and $H$ represent first and second-order gradient statistics of the loss function.
+The XGBoost model constructs an ensemble of shallow decision trees. During training, the algorithm learns optimal split thresholds across the six features to distinguish between safe passes, close passes, and critical incidents. By combining the predictions of multiple decision trees, the model achieves high classification accuracy while resisting noise from momentary sensor dropouts.
 
-\subsection{Encoding German StVO Statutory Clearances and Modal Penalties}
-The classifier integrates the legal requirements of German StVO \S\,5(4) \cite{stvo2020germany} by enforcing asymmetric loss penalties. Passing clearances below 1.5\,m are inherently penalized. Furthermore, counterpart vehicle mass penalties are applied: an overtaking truck or municipal bus ($C_{\text{type}} = 2$) displacing significant aerodynamic volume and possessing blind zones requires a widened safety buffer ($d_{\text{safe}} \ge 2.0\,\text{m}$), whereas peer bicycles passing on segregated paths ($C_{\text{type}} = 0$) are considered non-conflicting down to clearances of 0.80\,m.
+\subsection{Statutory Clearances and Vehicle Size Considerations}
+The classifier reflects established cycling safety guidelines (such as German StVO \S\,5(4) \cite{stvo2020germany}) while accounting for vehicle size differences:
+\begin{itemize}
+    \item \textbf{Heavy Vehicles (Trucks and Buses):} Because large commercial vehicles displace large aerodynamic volumes and have significant blind zones, passes below 2.0\,m are categorized with higher hazard weight.
+    \item \textbf{Passenger Cars:} Standard 1.5\,m clearance is enforced as the baseline safe passing threshold.
+    \item \textbf{Peer Bicycles:} On segregated bicycle paths, cyclists routinely ride side-by-side or pass with smaller clearances (0.8\,m to 1.2\,m) without imminent danger. The model recognizes peer bicycles to avoid false alarms.
+\end{itemize}
 
 \section{Data and Empirical Sources}
 The models and simulations in CycleSafe are calibrated using two empirical open-access transportation datasets:
