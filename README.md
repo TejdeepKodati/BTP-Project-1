@@ -80,6 +80,11 @@ The platform bridges real-world crowdsourced empirical bicycle sensor datasets (
 - **Pair-Specific Telemetry**: Acceleration/braking curves, proximity time-series, and Leaflet map markers reflect strictly the selected pair.
 - **Incident Hotspot Clustering**: Spatially aggregates conflicts occurring within 25 m into distinct collision hotspots on Leaflet maps with interactive pin hover tooltips.
 
+### 4. Embedded Hardware Architecture & Circuit Blueprint (Lab Prototyping)
+- **Circuit Blueprints & Schematics**: Complete 30-pin ESP32 DevKit pinout allocations, dual JSN-SR04T waterproof ultrasonic distance sensors, u-blox NEO-6M GPS module, and SSD1306 I2C OLED display.
+- **Dynamic Roll Tilt Compensation**: Frame roll angle math ($d_{\text{true}} = d_{\text{measured}} \cdot \cos \phi$) derived from MPU-6050 6-axis IMU accelerometer readings to correct for cornering lean.
+- **Verified Bill of Materials**: Complete 14-item BOM verified with domestic Indian suppliers delivering directly to IIT (ISM) Dhanbad (PIN: 826004) under INR 3,500, serving as the design blueprint for upcoming physical prototyping in the department laboratory.
+
 ---
 
 ## Repository Structure
@@ -102,6 +107,11 @@ The platform bridges real-world crowdsourced empirical bicycle sensor datasets (
 │   ├── predictor.py          # Production dual-backend inference engine
 │   ├── xgboost_safety_model.json # Serialized XGBoost model
 │   └── model_meta.json       # Feature importances and evaluation metrics
+├── hardware/                 # Embedded Hardware Architecture & Circuit Blueprints
+│   ├── hardware_components_specification.md # Indian supplier BOM & component procurement specs
+│   ├── HARDWARE_THEORY_AND_SCHEMATICS.md   # ESP32 pinouts, I2C bus wiring, and IMU tilt math
+│   ├── 3D_PRINTED_CASE_GUIDE.md           # Weatherproof PETG enclosure STL package & slicer specs
+│   └── PCB_FABRICATION_GUIDE.md           # 2-layer FR-4 custom PCB gerbers & soldering guide
 ├── simra_data/               # Real-world Berlin SimRa ride CSVs (TU Berlin)
 ├── sumo/                     # Microscopic Traffic Simulation
 │   ├── Dockerfile            # Sumo-runner container definition

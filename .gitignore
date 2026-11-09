@@ -82,6 +82,12 @@ references/
 start_cyclesafe.bat
 stop_cyclesafe.bat
 
+# Academic Thesis and Local Reports (Kept private/local, excluded from repository)
+thesis/
+*.docx
+*~$*.docx
+scripts/build_final_btp_report_docx.py
+
 # LaTeX build artifacts
 *.aux
 *.bbl
